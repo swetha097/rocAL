@@ -63,6 +63,8 @@ vx_size tensor_data_size(RocalTensorDataType data_type) {
             return sizeof(vx_uint32);
         case RocalTensorDataType::INT32:
             return sizeof(vx_int32);
+         case RocalTensorDataType::INT8:
+            return sizeof(vx_int8);
         default:
             throw std::runtime_error("tensor data_type not valid");
     }
@@ -77,6 +79,12 @@ vx_enum interpret_tensor_data_type(RocalTensorDataType data_type) {
             return VX_TYPE_FLOAT16;
         case RocalTensorDataType::UINT8:
             return VX_TYPE_UINT8;
+        case RocalTensorDataType::INT8:
+            return VX_TYPE_INT8;
+        case RocalTensorDataType::UINT32:
+            return VX_TYPE_UINT32;
+        case RocalTensorDataType::INT32:
+            return VX_TYPE_INT32;
         default:
             THROW("Unsupported Tensor type " + TOSTR(data_type))
     }
@@ -188,6 +196,7 @@ TensorInfo::TensorInfo(const TensorInfo &other) {
     _max_shape = other._max_shape;
     _is_image = other._is_image;
     _is_metadata = other._is_metadata;
+    _is_external_source = other._is_external_source;
     _channels = other._channels;
     if (!other.is_metadata()) {  // For Metadata ROI buffer is not required
         allocate_host_or_pinned_mem(&_roi_buf, _batch_size * 4 * sizeof(unsigned), _mem_type);

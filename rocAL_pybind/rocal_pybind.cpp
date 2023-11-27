@@ -96,6 +96,8 @@ std::unordered_map<int, std::string> rocalToPybindOutputDtype = {
     {1, "float16"},
     {2, "uint8"},
     {3, "int8"},
+    {4, "uint32"},
+    {5, "int32"},
 };
 
 PYBIND11_MODULE(rocal_pybind, m) {
@@ -279,6 +281,9 @@ PYBIND11_MODULE(rocal_pybind, m) {
         .value("FLOAT", ROCAL_FP32)
         .value("FLOAT16", ROCAL_FP16)
         .value("UINT8", ROCAL_UINT8)
+        .value("INT8", ROCAL_INT8)
+        .value("UINT32", ROCAL_UINT32)
+        .value("INT", ROCAL_INT)
         .export_values();
     py::enum_<RocalOutputMemType>(types_m, "RocalOutputMemType", "Output memory types")
         .value("HOST_MEMORY", ROCAL_MEMCPY_HOST)
@@ -530,6 +535,8 @@ PYBIND11_MODULE(rocal_pybind, m) {
           py::return_value_policy::reference);
     m.def("colorTwist", &rocalColorTwist,
           py::return_value_policy::reference);
+    m.def("ExternalSource", &rocalExternalSource,
+            py::return_value_policy::reference);
     m.def("colorTwistFixed", &rocalColorTwistFixed,
           py::return_value_policy::reference);
     m.def("cropMirrorNormalize", &rocalCropMirrorNormalize,

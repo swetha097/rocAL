@@ -38,6 +38,7 @@ THE SOFTWARE.
 #endif
 #include "commons.h"
 #include "rocal_api_tensor.h"
+#include "parameter_factory.h"
 
 /*! \brief Converts Rocal Memory type to OpenVX memory type
  *
@@ -138,6 +139,7 @@ class TensorInfo {
             if (!_max_shape.size()) _max_shape.resize(2);  // Since 2 values will be stored in the vector
             _max_shape[0] = _dims.at(1);
             _max_shape[1] = _num_of_dims > 2 ? _dims.at(2) : 0;
+            reset_tensor_roi_buffers();
         }
     }
     void set_tensor_layout(RocalTensorlayout layout) {
@@ -219,7 +221,9 @@ class TensorInfo {
         return _data_type_size;
     }
     bool is_image() const { return _is_image; }
+    bool is_external_source() const { return _is_external_source; }
     void set_metadata() { _is_metadata = true; }
+    void set_external_source() { _is_external_source = true; }
     bool is_metadata() const { return _is_metadata; }
 
    private:
@@ -239,6 +243,7 @@ class TensorInfo {
     std::vector<size_t> _max_shape;  //!< stores the the width and height dimensions in the tensor
     void reset_tensor_roi_buffers();
     bool _is_image = false;
+    bool _is_external_source = false;
     bool _is_metadata = false;
     size_t _channels = 3;  //!< stores the channel dimensions in the tensor
 };
@@ -276,12 +281,14 @@ class Tensor : public rocalTensor {
     void update_tensor_roi(const std::vector<uint32_t>& width, const std::vector<uint32_t>& height);
     void reset_tensor_roi() { _info.reset_tensor_roi_buffers(); }
     vx_tensor get_roi_tensor() { return _vx_roi_handle; }
+    pParam get_param() { return _param; }
     // create_from_handle() no internal memory allocation is done here since
     // tensor's handle should be swapped with external buffers before usage
     int create_from_handle(vx_context context);
     int create_virtual(vx_context context, vx_graph graph);
     bool is_handle_set() { return (_vx_handle != 0); }
     void set_dims(std::vector<size_t> dims) { _info.set_dims(dims); }
+    void set_param(pParam param) { _param = param; }
     unsigned num_of_dims() override { return _info.num_of_dims(); }
     unsigned batch_size() override { return _info.batch_size(); }
     std::vector<size_t> dims() override { return _info.dims(); }
@@ -303,6 +310,7 @@ class Tensor : public rocalTensor {
     TensorInfo _info;                //!< The structure holding the info related to the stored OpenVX tensor
     vx_context _context = nullptr;
     vx_tensor _vx_roi_handle = nullptr;  //!< The OpenVX tensor for ROI
+    pParam _param; //!< The Parameter which is a part of the parameter factory
 };
 
 /*! \brief Contains a list of rocalTensors */

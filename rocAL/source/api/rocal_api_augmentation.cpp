@@ -28,6 +28,41 @@ THE SOFTWARE.
 #include "rocal_api.h"
 
 RocalTensor ROCAL_API_CALL
+rocalExternalSource(RocalContext p_context,
+                    RocalTensor p_input,
+                    const char* file_path,
+                    RocalTensorOutputType dtype,
+                    int size,
+                    bool is_output)
+{
+    Tensor* output = nullptr;
+    if ((p_context == nullptr)) {
+        ERR("Invalid ROCAL context")
+        return output;
+    }
+
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(dtype);
+        TensorInfo output_info, input_info;
+        std::vector<size_t> new_dims = {context->user_batch_size(),1};
+        auto info = TensorInfo(std::move(new_dims),
+                            context->master_graph->mem_type(),
+                            op_tensor_datatype,
+                            RocalTensorlayout::NONE,
+                            RocalColorFormat::U8);
+        info.set_external_source();
+        output = context->master_graph->create_tensor(info, is_output);
+        context->master_graph->add_node<ExternalSourceNode>({input}, {output})->init(file_path, dtype);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
 rocalSequenceRearrange(RocalContext p_context,
                        RocalTensor p_input,
                        std::vector<unsigned int>& new_order,
@@ -634,8 +669,8 @@ rocalBrightness(
     RocalContext p_context,
     RocalTensor p_input,
     bool is_output,
-    RocalFloatParam p_alpha,
-    RocalFloatParam p_beta,
+    RocalTensor p_alpha,
+    RocalTensor p_beta,
     RocalTensorLayout output_layout,
     RocalTensorOutputType output_datatype) {
     Tensor* output = nullptr;
@@ -646,8 +681,8 @@ rocalBrightness(
 
     auto context = static_cast<Context*>(p_context);
     auto input = static_cast<Tensor*>(p_input);
-    auto alpha = static_cast<FloatParam*>(p_alpha);
-    auto beta = static_cast<FloatParam*>(p_beta);
+    auto alpha = static_cast<Tensor*>(p_alpha);
+    auto beta = static_cast<Tensor*>(p_beta);
     try {
         RocalTensorlayout op_tensor_layout = static_cast<RocalTensorlayout>(output_layout);
         RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(output_datatype);
@@ -700,7 +735,7 @@ rocalBlur(
     RocalContext p_context,
     RocalTensor p_input,
     bool is_output,
-    RocalIntParam p_kernel_size,
+    RocalTensor p_kernel_size,
     RocalTensorLayout output_layout,
     RocalTensorOutputType output_datatype) {
     Tensor* output = nullptr;
@@ -711,7 +746,7 @@ rocalBlur(
 
     auto context = static_cast<Context*>(p_context);
     auto input = static_cast<Tensor*>(p_input);
-    auto kernel_size = static_cast<IntParam*>(p_kernel_size);
+    auto kernel_size = static_cast<Tensor*>(p_kernel_size);
     try {
         RocalTensorlayout op_tensor_layout = static_cast<RocalTensorlayout>(output_layout);
         RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(output_datatype);
@@ -1220,8 +1255,8 @@ rocalContrast(
     RocalContext p_context,
     RocalTensor p_input,
     bool is_output,
-    RocalFloatParam p_contrast_factor,
-    RocalFloatParam p_contrast_center,
+    RocalTensor p_contrast_factor,
+    RocalTensor p_contrast_center,
     RocalTensorLayout output_layout,
     RocalTensorOutputType output_datatype) {
     Tensor* output = nullptr;
@@ -1232,8 +1267,8 @@ rocalContrast(
 
     auto context = static_cast<Context*>(p_context);
     auto input = static_cast<Tensor*>(p_input);
-    auto contrast_factor = static_cast<FloatParam*>(p_contrast_factor);
-    auto contrast_center = static_cast<FloatParam*>(p_contrast_center);
+    auto contrast_factor = static_cast<Tensor*>(p_contrast_factor);
+    auto contrast_center = static_cast<Tensor*>(p_contrast_center);
     try {
         RocalTensorlayout op_tensor_layout = static_cast<RocalTensorlayout>(output_layout);
         RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(output_datatype);

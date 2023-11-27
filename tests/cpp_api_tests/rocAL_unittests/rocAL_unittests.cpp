@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include <iostream>
 #include <string>
 #include <vector>
+#include <Python.h>
 
 #include "opencv2/opencv.hpp"
 #include "rocal_api.h"
@@ -183,8 +184,8 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
     rocalSetSeed(0);
 
     // Creating uniformly distributed random objects to override some of the default augmentation parameters
-    RocalIntParam color_temp_adj = rocalCreateIntParameter(-50);
-    RocalIntParam mirror = rocalCreateIntParameter(1);
+    RocalTensor color_temp_adj = rocalCreateIntParameter(handle, -50);
+    RocalTensor mirror = rocalCreateIntParameter(handle, 1);
 
     /*>>>>>>>>>>>>>>>>>>> Graph description <<<<<<<<<<<<<<<<<<<*/
 
@@ -340,6 +341,7 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
     RocalTensor input = decoded_output;
     // RocalTensor input = rocalResize(handle, decoded_output, resize_w, resize_h, false); // uncomment when processing images of different size
     RocalTensor output;
+    RocalTensor external_source_output;
 
     if ((test_case == 48 || test_case == 49 || test_case == 50) && rgb == 0) {
         std::cout << "Not a valid option! Exiting!\n";
@@ -390,7 +392,13 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
         case 5: {
             std::cout << ">>>>>>> Running "
                       << "rocalContrast" << std::endl;
-            output = rocalContrast(handle, input, true);
+
+            const size_t num_values = 2;
+            float values[num_values] = {3.0, 7.0};
+            double frequencies[num_values] = {1, 1};
+            RocalTensor contrast_factor = rocalCreateFloatRand(handle, values, frequencies, num_values);
+            RocalTensor contrast_centre = rocalCreateFloatRand(handle, values, frequencies, num_values);
+            output = rocalContrast(handle, input, true, contrast_factor, contrast_centre);
         } break;
         case 6: {
             std::cout << ">>>>>>> Running "
@@ -647,7 +655,13 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
             output = rocalResizeMirrorNormalize(handle, input, 400, 400, mean, std_dev, true, ROCAL_SCALING_MODE_DEFAULT,
                                                 {}, 0, 0, ROCAL_LINEAR_INTERPOLATION, mirror);
         } break;
-
+        case 57:{
+            std::cout << ">>>>>>> Running "
+                      << "rocalExternalSource" << std::endl;
+            Py_Initialize();
+            external_source_output = rocalExternalSource(handle, input, "/media/EOS_PR/rocAL/tests/cpp_api_tests/rocAL_unittests/external_source.py", "generate_random_numbers1", RocalTensorOutputType::ROCAL_INT, inputBatchSize, false);
+            output = rocalBlur(handle, input, true, external_source_output);
+        } break;
         default:
             std::cout << "Not a valid option! Exiting!\n";
             return -1;
@@ -771,8 +785,10 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
                 return -1;
             }
         }
-        auto last_colot_temp = rocalGetIntValue(color_temp_adj);
-        rocalUpdateIntParameter(last_colot_temp + 1, color_temp_adj);
+
+        // need to update with latest changes
+        // auto last_colot_temp = rocalGetIntValue(color_temp_adj);
+        // rocalUpdateIntParameter(last_colot_temp + 1, color_temp_adj);
 
         rocalCopyToOutput(handle, mat_input.data, h * w * p);
 
@@ -808,6 +824,7 @@ int test(int test_case, int reader_type, const char *path, const char *outName, 
     std::cout << "Process  time " << rocal_timing.process_time << std::endl;
     std::cout << "Transfer time " << rocal_timing.transfer_time << std::endl;
     std::cout << ">>>>> Total Elapsed Time " << dur / 1000000 << " sec " << dur % 1000000 << " us " << std::endl;
+    Py_Finalize();
     rocalRelease(handle);
     mat_input.release();
     mat_output.release();

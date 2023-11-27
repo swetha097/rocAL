@@ -32,15 +32,15 @@ class BrightnessNode : public Node {
     BrightnessNode() = delete;
 
     void init(float alpha, float beta);
-    void init(FloatParam *alpha_param, FloatParam *beta_param);
+    void init(Tensor *alpha_param, Tensor *beta_param);
 
    protected:
     void create_node() override;
     void update_node() override;
 
    private:
-    ParameterVX<float> _alpha;
-    ParameterVX<float> _beta;
+    ParameterVX<float> _alpha, _beta;
+    Tensor *_tensor_alpha = nullptr, *_tensor_beta = nullptr;
     constexpr static float ALPHA_RANGE[2] = {0.1, 1.95};
     constexpr static float BETA_RANGE[2] = {0, 25};
 };

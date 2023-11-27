@@ -32,7 +32,9 @@ from amd.rocal import reductions
 import amd.rocal.types as types
 import rocal_pybind as b
 from amd.rocal.pipeline import Pipeline
-
+import amd.rocal.reducer as r
+import os
+import dill
 
 def blend(*inputs, ratio=None, device=None, output_layout=types.NHWC, output_dtype=types.UINT8):
     """!Blends two input images given the ratio: output = input1*ratio + input2*(1-ratio)
@@ -45,7 +47,7 @@ def blend(*inputs, ratio=None, device=None, output_layout=types.NHWC, output_dty
 
         @return    blended image
     """
-    ratio = b.createFloatParameter(
+    ratio = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         ratio) if isinstance(ratio, float) else ratio
     # pybind call arguments
     kwargs_pybind = {"input_image0": inputs[0], "input_image1": inputs[1], "is_output": False, "ratio": ratio,
@@ -66,7 +68,7 @@ def snow(*inputs, snow=0.5, device=None, output_layout=types.NHWC, output_dtype=
 
         @return    Image with snow effect
     """
-    snow = b.createFloatParameter(snow) if isinstance(snow, float) else snow
+    snow = b.createFloatParameter(Pipeline._current_pipeline._handle, snow) if isinstance(snow, float) else snow
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "snow": snow,
                      "output_layout": output_layout, "output_dtype": output_dtype}
@@ -86,7 +88,7 @@ def exposure(*inputs, exposure=0.5, device=None, output_layout=types.NHWC, outpu
 
         @return    Image with adjusted exposure
     """
-    exposure = b.createFloatParameter(
+    exposure = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         exposure) if isinstance(exposure, float) else exposure
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "exposure": exposure,
@@ -126,7 +128,7 @@ def fog(*inputs, fog=0.5, device=None, output_layout=types.NHWC, output_dtype=ty
 
         @return    Image with fog effect
     """
-    fog = b.createFloatParameter(fog) if isinstance(fog, float) else fog
+    fog = b.createFloatParameter(Pipeline._current_pipeline._handle, fog) if isinstance(fog, float) else fog
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0],
                      "is_output": False, "fog_value": fog, "output_layout": output_layout, "output_dtype": output_dtype}
@@ -147,9 +149,9 @@ def brightness(*inputs, brightness=None, brightness_shift=None, device=None, out
 
         @return    Image with Adjusted Brightness
     """
-    brightness = b.createFloatParameter(brightness) if isinstance(
+    brightness = b.createFloatParameter(Pipeline._current_pipeline._handle, brightness) if isinstance(
         brightness, float) else brightness
-    brightness_shift = b.createFloatParameter(brightness_shift) if isinstance(
+    brightness_shift = b.createFloatParameter(Pipeline._current_pipeline._handle, brightness_shift) if isinstance(
         brightness_shift, float) else brightness_shift
 
     # pybind call arguments
@@ -193,9 +195,9 @@ def lens_correction(*inputs, strength=None, zoom=None, device=None, output_layou
 
         @return  Image with lens correction effect
     """
-    strength = b.createFloatParameter(
+    strength = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         strength) if isinstance(strength, float) else strength
-    zoom = b.createFloatParameter(zoom) if isinstance(zoom, float) else zoom
+    zoom = b.createFloatParameter(Pipeline._current_pipeline._handle, zoom) if isinstance(zoom, float) else zoom
 
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "strength": strength, "zoom": zoom,
@@ -217,7 +219,7 @@ def blur(*inputs, window_size=None, sigma=0.0, device=None, output_layout=types.
 
         @return    Image with Blur effect
     """
-    window_size = b.createIntParameter(window_size) if isinstance(
+    window_size = b.createIntParameter(Pipeline._current_pipeline._handle, window_size) if isinstance(
         window_size, int) else window_size
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "window_size": window_size,
@@ -239,9 +241,9 @@ def contrast(*inputs, contrast=None, contrast_center=None, device=None, output_l
 
         @return    Image with adjusted contrast
     """
-    contrast = b.createFloatParameter(
+    contrast = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         contrast) if isinstance(contrast, float) else contrast
-    contrast_center = b.createFloatParameter(contrast_center) if isinstance(
+    contrast_center = b.createFloatParameter(Pipeline._current_pipeline._handle, contrast_center) if isinstance(
         contrast_center, float) else contrast_center
 
     # pybind call arguments
@@ -264,9 +266,9 @@ def flip(*inputs, horizontal=0, vertical=0, device=None, output_layout=types.NHW
 
         @return    Flipped Image
     """
-    horizontal = b.createIntParameter(horizontal) if isinstance(
+    horizontal = b.createIntParameter(Pipeline._current_pipeline._handle, horizontal) if isinstance(
         horizontal, int) else horizontal
-    vertical = b.createIntParameter(
+    vertical = b.createIntParameter(Pipeline._current_pipeline._handle, 
         vertical) if isinstance(vertical, int) else vertical
 
     # pybind call arguments
@@ -288,7 +290,7 @@ def gamma_correction(*inputs, gamma=0.5, device=None, output_layout=types.NHWC, 
 
         @return Image with Gamma Correction
     """
-    gamma = b.createFloatParameter(
+    gamma = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         gamma) if isinstance(gamma, float) else gamma
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0],
@@ -310,7 +312,7 @@ def hue(*inputs, hue=None, device=None, seed=0, output_layout=types.NHWC, output
 
         @return    Image with Hue effect
     """
-    hue = b.createFloatParameter(hue) if isinstance(hue, float) else hue
+    hue = b.createFloatParameter(Pipeline._current_pipeline._handle, hue) if isinstance(hue, float) else hue
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0],
                      "is_output": False, "hue": hue, "output_layout": output_layout, "output_dtype": output_dtype}
@@ -332,7 +334,7 @@ def jitter(*inputs, kernel_size=None, seed=0, fill_value=0.0, device=None, outpu
 
         @return    Image with Jitter effect
     """
-    kernel_size = b.createIntParameter(kernel_size) if isinstance(
+    kernel_size = b.createIntParameter(Pipeline._current_pipeline._handle, kernel_size) if isinstance(
         kernel_size, int) else kernel_size
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0],
@@ -375,12 +377,12 @@ def rain(*inputs, rain=None, rain_width=None, rain_height=None, rain_transparenc
 
         @return    Images with Rain effect
     """
-    rain = b.createFloatParameter(rain) if isinstance(rain, float) else rain
-    rain_width = b.createIntParameter(rain_width) if isinstance(
+    rain = b.createFloatParameter(Pipeline._current_pipeline._handle, rain) if isinstance(rain, float) else rain
+    rain_width = b.createIntParameter(Pipeline._current_pipeline._handle, rain_width) if isinstance(
         rain_width, int) else rain_width
-    rain_height = b.createIntParameter(rain_height) if isinstance(
+    rain_height = b.createIntParameter(Pipeline._current_pipeline._handle, rain_height) if isinstance(
         rain_height, int) else rain_height
-    rain_transparency = b.createFloatParameter(rain_transparency) if isinstance(
+    rain_transparency = b.createFloatParameter(Pipeline._current_pipeline._handle, rain_transparency) if isinstance(
         rain_transparency, float) else rain_transparency
 
     # pybind call arguments
@@ -442,9 +444,9 @@ def resize_crop_mirror(*inputs, resize_width=0, resize_height=0, crop_w=0, crop_
     """
     if isinstance(mirror, int):
         if (mirror == 0):
-            mirror = b.createIntParameter(0)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 0)
         else:
-            mirror = b.createIntParameter(1)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 1)
 
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "dest_width:": resize_width, "dest_height": resize_height, "is_output": False, "crop_w": crop_w,
@@ -477,13 +479,13 @@ def resize_crop(*inputs, resize_width=0, resize_height=0, crop_area_factor=None,
 
         @return    Resized and cropped Image
     """
-    crop_area_factor = b.createFloatParameter(crop_area_factor) if isinstance(
+    crop_area_factor = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_area_factor) if isinstance(
         crop_area_factor, float) else crop_area_factor
-    crop_aspect_ratio = b.createFloatParameter(crop_aspect_ratio) if isinstance(
+    crop_aspect_ratio = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_aspect_ratio) if isinstance(
         crop_aspect_ratio, float) else crop_aspect_ratio
-    x_drift = b.createFloatParameter(
+    x_drift = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         x_drift) if isinstance(x_drift, float) else x_drift
-    y_drift = b.createFloatParameter(
+    y_drift = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         y_drift) if isinstance(y_drift, float) else y_drift
 
     # pybind call arguments
@@ -523,9 +525,9 @@ def resize_mirror_normalize(*inputs, max_size=[], resize_longer=0, resize_shorte
     """
     if isinstance(mirror, int):
         if (mirror == 0):
-            mirror = b.createIntParameter(0)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 0)
         else:
-            mirror = b.createIntParameter(1)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 1)
 
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "dest_width:": resize_width, "dest_height": resize_height, "mean": mean, "std_dev": std, "is_output": False,
@@ -580,7 +582,7 @@ def rotate(*inputs, angle=None, dest_width=0, dest_height=0, interpolation_type=
 
         @return    Roatated Image
     """
-    angle = b.createFloatParameter(
+    angle = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         angle) if isinstance(angle, float) else angle
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False,
@@ -601,7 +603,7 @@ def saturation(*inputs, saturation=1.0, device=None, output_layout=types.NHWC, o
 
         @return    Image with Saturation effect
     """
-    saturation = b.createFloatParameter(saturation) if isinstance(
+    saturation = b.createFloatParameter(Pipeline._current_pipeline._handle, saturation) if isinstance(
         saturation, float) else saturation
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0],
@@ -632,15 +634,15 @@ def ssd_random_crop(*inputs, p_threshold=None, crop_area_factor=None, crop_aspec
 
         @return    Randomly Cropped images for SSD training
     """
-    p_threshold = b.createFloatParameter(p_threshold) if isinstance(
+    p_threshold = b.createFloatParameter(Pipeline._current_pipeline._handle, p_threshold) if isinstance(
         p_threshold, float) else p_threshold
-    crop_area_factor = b.createFloatParameter(crop_area_factor) if isinstance(
+    crop_area_factor = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_area_factor) if isinstance(
         crop_area_factor, float) else crop_area_factor
-    crop_aspect_ratio = b.createFloatParameter(crop_aspect_ratio) if isinstance(
+    crop_aspect_ratio = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_aspect_ratio) if isinstance(
         crop_aspect_ratio, float) else crop_aspect_ratio
-    crop_pos_x = b.createFloatParameter(crop_pos_x) if isinstance(
+    crop_pos_x = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_pos_x) if isinstance(
         crop_pos_x, float) else crop_pos_x
-    crop_pos_y = b.createFloatParameter(crop_pos_y) if isinstance(
+    crop_pos_y = b.createFloatParameter(Pipeline._current_pipeline._handle, crop_pos_y) if isinstance(
         crop_pos_y, float) else crop_pos_y
 
     # pybind call arguments
@@ -686,7 +688,7 @@ def vignette(*inputs, vignette=0.5, device=None, output_layout=types.NHWC, outpu
 
         @return    Images with Vignette effect
     """
-    vignette = b.createFloatParameter(
+    vignette = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         vignette) if isinstance(vignette, float) else vignette
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "sdev": vignette,
@@ -727,9 +729,9 @@ def crop_mirror_normalize(*inputs, crop=[0, 0], crop_pos_x=0.5, crop_pos_y=0.5,
 
     if isinstance(mirror, int):
         if (mirror == 0):
-            mirror = b.createIntParameter(0)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 0)
         else:
-            mirror = b.createIntParameter(1)
+            mirror = b.createIntParameter(Pipeline._current_pipeline._handle, 1)
 
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "crop_height": crop_height, "crop_width": crop_width, "start_x": crop_pos_x, "start_y": crop_pos_y, "mean": mean, "std_dev": std,
@@ -837,12 +839,12 @@ def color_twist(*inputs, brightness=1.0, contrast=1.0, hue=0.0,
 
         @return    Images with Adjusted Brightness, Hue and Saturation
     """
-    brightness = b.createFloatParameter(brightness) if isinstance(
+    brightness = b.createFloatParameter(Pipeline._current_pipeline._handle, brightness) if isinstance(
         brightness, float) else brightness
-    contrast = b.createFloatParameter(
+    contrast = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         contrast) if isinstance(contrast, float) else contrast
-    hue = b.createFloatParameter(hue) if isinstance(hue, float) else hue
-    saturation = b.createFloatParameter(saturation) if isinstance(
+    hue = b.createFloatParameter(Pipeline._current_pipeline._handle, hue) if isinstance(hue, float) else hue
+    saturation = b.createFloatParameter(Pipeline._current_pipeline._handle, saturation) if isinstance(
         saturation, float) else saturation
 
     # pybind call arguments
@@ -960,7 +962,7 @@ def color_temp(*inputs, adjustment_value=50, device=None, output_layout=types.NH
 
         @return    Images with Adjusted Color temperature
     """
-    adjustment_value = b.createIntParameter(adjustment_value) if isinstance(
+    adjustment_value = b.createIntParameter(Pipeline._current_pipeline._handle, adjustment_value) if isinstance(
         adjustment_value, int) else adjustment_value
     # pybind call arguments
     kwargs_pybind = {"input_image": inputs[0], "is_output": False, "adjustment_value": adjustment_value,
@@ -1016,13 +1018,13 @@ def snp_noise(*inputs, p_noise=0.0, p_salt=0.0, noise_val=0.0, salt_val=0.0,
 
         @return    images with salt-and-pepper noise added.
     """
-    p_noise = b.createFloatParameter(
+    p_noise = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         p_noise) if isinstance(p_noise, float) else p_noise
-    p_salt = b.createFloatParameter(
+    p_salt = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         p_salt) if isinstance(p_salt, float) else p_salt
-    noise_val = b.createFloatParameter(noise_val) if isinstance(
+    noise_val = b.createFloatParameter(Pipeline._current_pipeline._handle, noise_val) if isinstance(
         noise_val, float) else noise_val
-    salt_val = b.createFloatParameter(
+    salt_val = b.createFloatParameter(Pipeline._current_pipeline._handle, 
         salt_val) if isinstance(salt_val, float) else salt_val
 
     # pybind call arguments
@@ -1055,3 +1057,33 @@ def box_iou_matcher(*inputs, anchors, criteria=0.5, high_threshold=0.5,
         Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     Pipeline._current_pipeline._box_iou_matcher = True
     return (box_iou_matcher, [])
+
+def external_source(*inputs, source=None, dtype = None, size=0):
+
+    result_tuple = r.serialize_function_data(source)
+    serialized_result = dill.dumps(result_tuple)
+    with open('serialized_data.bin', 'wb') as file:
+        file.write(serialized_result)
+    current_directory = os.getcwd()
+
+    # Create the full path for the serialized data file
+    file_path = os.path.join(current_directory, 'serialized_data.bin')
+    # Call the source function with the given size
+    result = source(size)
+    if dtype is None:
+        # get the data type of the first element in the result
+        dtype = type(result[0]).__name__
+
+        # Map Python data types to corresponding rocal_pybind types
+        if dtype == "int":
+            dtype = types.INT
+        elif dtype == "float":
+            dtype = types.FLOAT
+        else:
+            print("Error: Unknown data type")
+            exit()
+
+    kwargs_pybind = {"input_image": inputs[0], "file_path": file_path, "dtype":dtype, "size":size, "is_output":False}
+    output = b.ExternalSource(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    Pipeline._current_pipeline._external_source_operator = True
+    return (output)

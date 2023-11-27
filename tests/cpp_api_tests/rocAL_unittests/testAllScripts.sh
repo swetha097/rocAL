@@ -168,6 +168,8 @@ do
         ./rocal_unittests 9 "$caffe2_detection_path" "${output_path}Resize_${rgb_name[$rgb]}_${device_name}_triangular_default_caffe2Detection" $width $height 0 $device $rgb 0 $display 5 0
         ./rocal_unittests 11 "$mxnet_path" "${output_path}Resize_${rgb_name[$rgb]}_${device_name}_gaussian_default_mxnet" $width $height 0 $device $rgb 0 $display 4 0 
 
+        # external source
+        ./rocal_unittests 2 "$coco_detection_path" "${output_path}External_${rgb_name[$rgb]}_${device_name}" $width $height 57 $device $rgb 0 $display
     done
 done
 

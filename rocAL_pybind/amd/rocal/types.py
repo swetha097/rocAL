@@ -37,7 +37,9 @@ from rocal_pybind.types import CPU
 from rocal_pybind.types import UINT8
 from rocal_pybind.types import FLOAT
 from rocal_pybind.types import FLOAT16
-from rocal_pybind.types import UINT8
+from rocal_pybind.types import INT8
+from rocal_pybind.types import UINT32
+from rocal_pybind.types import INT
 
 #  RocalOutputMemType
 from rocal_pybind.types import HOST_MEMORY
