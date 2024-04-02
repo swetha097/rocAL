@@ -64,6 +64,8 @@ class SequenceFileSourceReader : public Reader {
 
     SequenceFileSourceReader();
 
+    size_t last_batch_padded_size() override;
+
    private:
     //! opens the folder containnig the images
     Reader::Status open_folder();
@@ -105,4 +107,7 @@ class SequenceFileSourceReader : public Reader {
     void incremenet_sequence_id() { _sequence_id++; }
     void replicate_last_sequence_to_fill_last_shard();
     void replicate_last_batch_to_pad_partial_shard();
+    std::pair<RocalBatchPolicy, bool>  _last_batch_info;
+    size_t _last_batch_padded_size = 0;
+    void increment_shard_id(); //!< Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
 };

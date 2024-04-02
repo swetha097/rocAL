@@ -53,6 +53,8 @@ class VideoFileSourceReader : public VideoReader {
 
     VideoFileSourceReader();
 
+    size_t last_batch_padded_size() override;
+
    private:
     std::string _folder_path;
     std::vector<std::string> _video_file_names;
@@ -87,5 +89,8 @@ class VideoFileSourceReader : public VideoReader {
     void replicate_last_sequence_to_fill_last_shard();
     void replicate_last_batch_to_pad_partial_shard();
     VideoReader::Status create_sequence_info();
+    std::pair<RocalBatchPolicy, bool>  _last_batch_info;
+    size_t _last_batch_padded_size = 0;
+    void increment_shard_id(); //!< Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
 };
 #endif

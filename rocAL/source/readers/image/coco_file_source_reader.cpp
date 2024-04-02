@@ -21,10 +21,18 @@ THE SOFTWARE.
 */
 
 #include "coco_file_source_reader.h"
-#include "meta_data_reader_factory.h"
-#include "meta_data_graph_factory.h"
-#include "filesystem.h"
 
+#include <commons.h>
+
+#include <algorithm>
+#include <boost/filesystem.hpp>
+#include <cassert>
+
+#include "coco_meta_data_reader.h"
+#include "meta_data_graph_factory.h"
+#include "meta_data_reader_factory.h"
+
+namespace filesys = boost::filesystem;
 #define USE_STDIO_FILE 0
 
 COCOFileSourceReader::COCOFileSourceReader() {
@@ -59,6 +67,7 @@ Reader::Status COCOFileSourceReader::initialize(ReaderConfig desc) {
     _loop = desc.loop();
     _shuffle = desc.shuffle();
     _meta_data_reader = desc.meta_data_reader();
+    _last_batch_info = desc.get_last_batch_policy();
 
     if (_json_path == "") {
         std::cout << "\n _json_path has to be set manually";
@@ -68,49 +77,9 @@ Reader::Status COCOFileSourceReader::initialize(ReaderConfig desc) {
     //     std::cout<<"Metadata reader not initialized for COCO file source\n";
 
     ret = subfolder_reading();
-    // the following code is required to make every shard the same size:: required for multi-gpu training
-    if (_shard_count > 1 && _batch_count > 1) {
-        int _num_batches = _file_names.size() / _batch_count;
-        int max_batches_per_shard = (_file_count_all_shards + _shard_count - 1) / _shard_count;
-        max_batches_per_shard = (max_batches_per_shard + _batch_count - 1) / _batch_count;
-        if (_num_batches < max_batches_per_shard) {
-            replicate_last_batch_to_pad_partial_shard();
-        }
-    }
-
-    if (_meta_data_reader && _meta_data_reader->get_aspect_ratio_grouping()) {
-        // calculate the aspect ratio for each file and create a pair of <filename, aspect_ratio>
-        std::vector<std::pair<std::string, float>> file_aspect_ratio_pair(_file_names.size());
-        for (size_t i = 0; i < _file_names.size(); i++) {
-            auto filename = _file_names[i];
-            std::string base_filename = filename.substr(filename.find_last_of("/\\") + 1);
-            auto img_size = _meta_data_reader->lookup_image_size(base_filename);
-            auto aspect_ratio = static_cast<float>(img_size.h) / img_size.w;
-            file_aspect_ratio_pair[i] = std::make_pair(filename, aspect_ratio);
-            _aspect_ratios.push_back(aspect_ratio);
-        };
-
-        // sort the <filename, aspect_ratio> pairs according to aspect ratios
-        std::sort(file_aspect_ratio_pair.begin(), file_aspect_ratio_pair.end(), [](auto &lop, auto &rop) { return lop.second < rop.second; });
-
-        // extract sorted file_names
-        std::transform(file_aspect_ratio_pair.begin(), file_aspect_ratio_pair.end(), std::back_inserter(_sorted_file_names), [](auto &pair) { return pair.first; });
-        // extract sorted aspect ratios
-        _aspect_ratios.clear();
-        std::transform(file_aspect_ratio_pair.begin(), file_aspect_ratio_pair.end(), std::back_inserter(_aspect_ratios), [](auto &pair) { return pair.second; });
-
-        // Copy the sorted file_names to _file_names vector to be used in sharding
-        _file_names = _sorted_file_names;
-
-        // shuffle dataset if set
-        if (ret == Reader::Status::OK && _shuffle) {
-            shuffle_with_aspect_ratios();
-        }
-    } else {
-        // shuffle dataset if set
-        if (ret == Reader::Status::OK && _shuffle)
-            std::random_shuffle(_file_names.begin(), _file_names.end());
-    }
+    // shuffle dataset if set
+    if (ret == Reader::Status::OK && _shuffle)
+        std::random_shuffle(_file_names.begin(), _file_names.end());
     return ret;
 }
 
@@ -118,6 +87,11 @@ void COCOFileSourceReader::incremenet_read_ptr() {
     _read_counter++;
     _curr_file_idx = (_curr_file_idx + 1) % _file_names.size();
 }
+
+size_t COCOFileSourceReader::last_batch_padded_size() {
+    return _last_batch_padded_size;
+}
+
 size_t COCOFileSourceReader::open() {
     auto file_path = _file_names[_curr_file_idx];  // Get next file name
     incremenet_read_ptr();
@@ -195,32 +169,16 @@ int COCOFileSourceReader::release() {
     return 0;
 }
 
-void COCOFileSourceReader::shuffle_with_aspect_ratios() {
-    // Calculate the mid element which divides the aspect ratios into two groups (<=1.0 and >1.0)
-    auto mid = std::upper_bound(_aspect_ratios.begin(), _aspect_ratios.end(), 1.0f) - _aspect_ratios.begin();
-    // Shuffle within groups using the mid element as the limit - [start, mid) and [mid, last)
-    std::random_shuffle(_file_names.begin(), _file_names.begin() + mid);
-    std::random_shuffle(_file_names.begin() + mid, _file_names.end());
-    std::vector<std::string> shuffled_filenames;
-    int split_count = _file_names.size() / _batch_count;  // Number of batches for this shard
-    std::vector<int> indexes(split_count);
-    std::iota(indexes.begin(), indexes.end(), 0);
-    // Shuffle the index vector and use the index to fetch batch size elements for decoding
-    std::random_shuffle(indexes.begin(), indexes.end());
-    for (auto const idx : indexes)
-        shuffled_filenames.insert(shuffled_filenames.end(), _file_names.begin() + idx * _batch_count, _file_names.begin() + idx * _batch_count + _batch_count);
-    _file_names = shuffled_filenames;
+void COCOFileSourceReader::reset() {
+    if (_shuffle)
+        std::random_shuffle(_file_names.begin(), _file_names.end());
+    _read_counter = 0;
+    if (_last_batch_info.second == true)
+        _curr_file_idx = 0;
 }
 
-void COCOFileSourceReader::reset() {
-    if (_meta_data_reader && _meta_data_reader->get_aspect_ratio_grouping()) {
-        _file_names = _sorted_file_names;
-        if (_shuffle) shuffle_with_aspect_ratios();
-    } else if (_shuffle) {
-        std::random_shuffle(_file_names.begin(), _file_names.end());
-    }
-    _read_counter = 0;
-    _curr_file_idx = 0;
+void COCOFileSourceReader::increment_shard_id() {
+    _shard_id = (_shard_id + 1) % _shard_count;
 }
 
 Reader::Status COCOFileSourceReader::subfolder_reading() {
@@ -252,6 +210,24 @@ Reader::Status COCOFileSourceReader::subfolder_reading() {
                 WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] File reader cannot access the storage at " + _folder_path);
         }
     }
+    std::sort(_file_names.begin(), _file_names.end());
+    _last_file_name = _file_names[_file_names.size() - 1];
+
+    uint images_to_pad_shard = _file_count_all_shards - (ceil(_file_count_all_shards / _shard_count) * _shard_count);
+    if (!images_to_pad_shard) {
+        for (uint i = 0; i < images_to_pad_shard; i++) {
+            if (get_file_shard_id() != _shard_id) {
+                _file_count_all_shards++;
+                incremenet_file_id();
+                continue;
+            }
+            _last_file_name = _file_names.at(i);
+            _file_names.push_back(_last_file_name);
+            _file_count_all_shards++;
+            incremenet_file_id();
+        }
+    }
+
     if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
         replicate_last_image_to_fill_last_shard();
         LOG("FileReader ShardID [" + TOSTR(_shard_id) + "] Replicated " + _folder_path + _last_file_name + " " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
@@ -262,8 +238,17 @@ Reader::Status COCOFileSourceReader::subfolder_reading() {
     return ret;
 }
 void COCOFileSourceReader::replicate_last_image_to_fill_last_shard() {
-    for (size_t i = _in_batch_read_count; i < _batch_count; i++)
-        _file_names.push_back(_last_file_name);
+    if (_last_batch_info.first == RocalBatchPolicy::BATCH_FILL || _last_batch_info.first == RocalBatchPolicy::PARTIAL) {
+        if (_last_batch_info.second == true) {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++)
+                _file_names.push_back(_last_file_name);
+        } else {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++)
+                _file_names.push_back(_file_names.at(i));
+        }
+    }
+    if (_last_batch_info.first == RocalBatchPolicy::PARTIAL)
+        _last_batch_padded_size = _batch_count - _in_batch_read_count;
 }
 
 void COCOFileSourceReader::replicate_last_batch_to_pad_partial_shard() {
@@ -298,8 +283,6 @@ Reader::Status COCOFileSourceReader::open_folder() {
     }
     if (_file_names.empty())
         WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] Did not load any file from " + _folder_path)
-    std::sort(_file_names.begin(), _file_names.end());
-    _last_file_name = _file_names[_file_names.size() - 1];
 
     closedir(_src_dir);
     return Reader::Status::OK;
