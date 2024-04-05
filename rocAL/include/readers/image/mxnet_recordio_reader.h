@@ -114,6 +114,8 @@ class MXNetRecordIOReader : public Reader {
     ImageRecordIOHeader _hdr;
     std::pair<RocalBatchPolicy, bool>  _last_batch_info;
     size_t _last_batch_padded_size = 0;
+    bool _stick_to_shard = false;
+    Reader::Status generate_file_names();
     void increment_shard_id(); //!< Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
 
 };
