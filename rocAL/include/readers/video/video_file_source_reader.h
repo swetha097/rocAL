@@ -72,6 +72,7 @@ class VideoFileSourceReader : public VideoReader {
     std::string _last_id;
     size_t _shard_id = 0;
     size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     //!< _batch_count Defines the quantum count of the sequences to be read. It's usually equal to the user's batch size.
     /// The loader will repeat sequences if necessary to be able to have the sequences available in multiples of the load_batch_count,
     /// for instance if there are 10 sequences in the dataset and _batch_count is 3, the loader repeats 2 sequences as if there are 12 sequences available.

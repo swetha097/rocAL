@@ -64,6 +64,8 @@ class CIFAR10DataReader : public Reader {
 
     unsigned get_file_index() { return _last_file_idx; }
 
+    size_t last_batch_padded_size() override;
+
    private:
     //! opens the folder containing the images
     Reader::Status open_folder();
@@ -80,6 +82,9 @@ class CIFAR10DataReader : public Reader {
     unsigned _current_file_size;
     std::string _last_id;
     std::string _last_file_name;
+    size_t _shard_id = 0;
+    size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     unsigned _last_file_idx;  // index of individual raw file in a batched file
     // hard_coding the following for now. Eventually needs to add in the ReaderConfig
     //!< file_name_prefix tells the reader to read only files with the prefix:: eventually needs to be passed through ReaderConfig

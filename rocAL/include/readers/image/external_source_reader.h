@@ -79,6 +79,8 @@ class ExternalSourceReader : public Reader, public ExternalSourceImageReader {
     // get image_dims
     void get_dims(int cur_idx, int& width, int& height, int& channels, unsigned& roi_width, unsigned& roi_height);
 
+    size_t last_batch_padded_size() override;
+
    private:
     //! opens the folder containnig the images
     std::string _folder_path;
@@ -94,6 +96,7 @@ class ExternalSourceReader : public Reader, public ExternalSourceImageReader {
     std::string _last_id;
     size_t _shard_id = 0;
     size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     //!< _batch_count Defines the quantum count of the images to be read. It's usually equal to the user's batch size.
     /// The loader will repeat images if necessary to be able to have images available in multiples of the load_batch_count,
     /// for instance if there are 10 images in the dataset and _batch_count is 3, the loader repeats 2 images as if there are 12 images available.
