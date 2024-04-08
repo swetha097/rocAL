@@ -48,7 +48,6 @@ enum class StorageType {
     MXNET_RECORDIO = 7,
     VIDEO_FILE_SYSTEM = 8,
     EXTERNAL_FILE_SOURCE = 9,      // to support reading from external source
-    FILE_LIST_SYSTEM = 10          // to support reading from file lists
 };
 
 enum class ExternalSourceFileMode {
@@ -81,6 +80,12 @@ struct ReaderConfig {
     void set_frame_step(unsigned step) { _sequence_frame_step = step; }
     void set_frame_stride(unsigned stride) { _sequence_frame_stride = stride; }
     void set_external_filemode(ExternalSourceFileMode mode) { _file_mode = mode; }
+    void set_last_batch_policy(RocalBatchPolicy last_batch_policy, bool last_batch_padded) {
+        _last_batch_policy = last_batch_policy;
+        _last_batch_padded = last_batch_padded;
+    }
+    void set_stick_to_shard(bool stick_to_shard) { _stick_to_shard = stick_to_shard; }
+    void set_shard_size(signed shard_size) { _shard_size = shard_size; }
     size_t get_shard_count() { return _shard_count; }
     size_t get_shard_id() { return _shard_id; }
     size_t get_cpu_num_threads() { return _cpu_num_threads; }
@@ -97,6 +102,8 @@ struct ReaderConfig {
     std::map<std::string, std::string> feature_key_map() { return _feature_key_map; }
     void set_file_prefix(const std::string &prefix) { _file_prefix = prefix; }
     std::string file_prefix() { return _file_prefix; }
+    void set_file_list_path(const std::string &file_list_path) { _file_list_path = file_list_path; }
+    std::string file_list_path() { return _file_list_path; }
     std::shared_ptr<MetaDataReader> meta_data_reader() { return _meta_data_reader; }
     ExternalSourceFileMode mode() { return _file_mode; }
     std::pair<RocalBatchPolicy, bool> get_last_batch_policy() { return std::pair<RocalBatchPolicy, bool>(_last_batch_policy, _last_batch_padded); }
@@ -118,9 +125,10 @@ struct ReaderConfig {
     bool _shuffle = false;
     bool _loop = false;
     std::string _file_prefix = "";  //!< to read only files with prefix. supported only for cifar10_data_reader and tf_record_reader
+    std::string _file_list_path = "";  //!< to read only files present in the file list
     std::shared_ptr<MetaDataReader> _meta_data_reader = nullptr;
     ExternalSourceFileMode _file_mode = ExternalSourceFileMode::NONE;
-    RocalBatchPolicy _last_batch_policy = RocalBatchPolicy::BATCH_FILL;
+    RocalBatchPolicy _last_batch_policy = RocalBatchPolicy::FILL;
     bool _last_batch_padded = false;
     bool _stick_to_shard = false;
     signed _shard_size = -1;
@@ -180,12 +188,12 @@ class Reader {
     virtual std::string id() = 0;
     //! Returns the number of items remained in this resource
 
-     //! Returns the path of the last item opened in this resource
+    //! Returns the path of the last item opened in this resource
     virtual std::string file_path() { return {}; }
 
     virtual unsigned count_items() = 0;
 
     virtual ~Reader() = default;
 
-    virtual size_t last_batch_padded_size() { return 0; }
+    virtual size_t last_batch_padded_size() { return {}; }
 };

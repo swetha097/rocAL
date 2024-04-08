@@ -238,7 +238,13 @@ enum RocalTensorOutputType {
     ROCAL_UINT8 = 2,
     /*! \brief AMD ROCAL_INT8
      */
-    ROCAL_INT8 = 3
+    ROCAL_INT8 = 3,
+    /*! \brief AMD ROCAL_UINT32
+     */
+    ROCAL_UINT32 = 4,
+    /*! \brief AMD ROCAL_INT32
+     */
+    ROCAL_INT32 = 5
 };
 
 /*! \brief rocAL Decoder Type enum
@@ -380,25 +386,52 @@ enum RocalExternalSourceMode {
  * \ingroup group_rocal_types
  */
 enum RocalAudioBorderType {
-    ZERO = 0,
-    CLAMP,
-    REFLECT
+    /*! \brief AMD ROCAL_ZERO
+     */
+    ROCAL_ZERO = 0,
+    /*! \brief AMD ROCAL_CLAMP
+     */
+    ROCAL_CLAMP = 1,
+    /*! \brief AMD ROCAL_REFLECT
+     */
+    ROCAL_REFLECT = 2
 };
 
+/*! \brief rocAL Spectrogram Layout Type enum
+ * \ingroup group_rocal_types
+ */
 enum RocalSpectrogramLayout {
-    FT = 0,
-    TF
+    /*! \brief Frequency Major
+     */
+    ROCAL_FT = 0,
+    /*! \brief Time Major
+     */
+    ROCAL_TF
 };
 
+/*! \brief rocAL Out Of Bounds Policy Type enum
+ * \ingroup group_rocal_types
+ */
 enum RocalOutOfBoundsPolicy {
-    PAD = 0,
-    TRIMTOSHAPE,
-    ERROR
+    /*! \brief Pad
+     */
+    ROCAL_PAD = 0,
+    /*! \brief Trimtoshape
+     */
+    ROCAL_TRIMTOSHAPE,
+    /*! \brief Error
+     */
+    ROCAL_ERROR
+};
+
+enum RocalMelScaleFormula {
+    SLANEY = 0,  // Follows Slaney’s MATLAB Auditory Modelling Work behavior
+    HTK          // Follows O’Shaughnessy’s book formula, consistent with Hidden Markov Toolkit(HTK), m = 2595 * log10(1 + (f/700))
 };
 
 /*! \brief Tensor Last Batch Policies
  *  \ingroup group_rocal_types
- These policies the last batch policies determine the behavior when there are not enough samples in the epoch to fill the last batch
+ The last batch policies determine the behavior when there are not enough samples in the epoch to fill the last batch
         FILL - The last batch is filled by either repeating the last sample or by wrapping up the data set.
         DROP - The last batch is dropped if when there are not enough samples from the current epoch.
         PARTIAL - The last batch is partially filled with the remaining data from the current epoch, keeping the rest of the samples empty. (currently this policy works similar to FILL in rocAL, PARTIAL policy needs to handled from python end)
@@ -408,4 +441,5 @@ enum RocalLastBatchPolicy {
     ROCAL_LAST_BATCH_DROP = 1,
     ROCAL_LAST_BATCH_PARTIAL = 2
 };
+
 #endif  // MIVISIONX_ROCAL_API_TYPES_H

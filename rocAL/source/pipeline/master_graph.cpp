@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2024 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -117,9 +117,9 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, size_t cpu_t
                                                                                                                                                                                                                                                  _box_encoder_gpu(nullptr),
 #endif
                                                                                                                                                                                                                                                  _rb_block_if_empty_time("Ring Buffer Block IF Empty Time"),
-                                                                                                                                                                                                                                                 _rb_block_if_full_time("Ring Buffer Block IF Full Time",
+                                                                                                                                                                                                                                                 _rb_block_if_full_time("Ring Buffer Block IF Full Time"),
                                                                                                                                                                                                                                                 _last_batch_policy(last_batch_policy),
-                                                                                                                                                                                                                                                _last_batch_padded(last_batch_padded)) {
+                                                                                                                                                                                                                                                _last_batch_padded(last_batch_padded) {
     try {
         vx_status status;
         vxRegisterLogCallback(NULL, log_callback, vx_false_e);
@@ -184,6 +184,7 @@ MasterGraph::MasterGraph(size_t batch_size, RocalAffinity affinity, size_t cpu_t
             _device.init_ocl(_context);
 #endif
         }
+        ParameterFactory::instance()->set_seed(0);  // Setting default seed for ParameterFactory instance. User can set the seed manually by calling rocalSetSeed(seed_value)
     } catch (const std::exception &e) {
         release();
         throw;
@@ -443,12 +444,13 @@ MasterGraph::last_batch_policy() {
     return _last_batch_policy;
 }
 
-bool MasterGraph::last_batch_padded() {
+bool
+MasterGraph::last_batch_padded() {
     return _last_batch_padded;
 }
 
 uint 
-MasterGraph::() {
+MasterGraph::last_batch_padded_size() {
     return _loader_module->last_batch_padded_size();
 }
 
@@ -1149,14 +1151,17 @@ std::vector<rocalTensorList *> MasterGraph::create_label_reader(const char *sour
         THROW("A metadata reader has already been created")
     if (_augmented_meta_data)
         THROW("Metadata can only have a single output")
+    if (strlen(source_path) == 0 && strlen(file_list_path) == 0)
+        THROW("Either source path or file list path needs to be provided")
     const char *root_path;
-    if (strlen(file_list_path) == 0)
+    if (strlen(file_list_path) == 0) {
         root_path = source_path;
-    else
+    } else {
         root_path = file_list_path;
+    }
     MetaDataConfig config(MetaDataType::Label, reader_type, root_path);
     _meta_data_reader = create_meta_data_reader(config, _augmented_meta_data);
-    _meta_data_reader->read_all(source_path);
+    _meta_data_reader->read_all(root_path);
 
     std::vector<size_t> dims = {1};
     auto default_labels_info = TensorInfo(std::move(dims), _mem_type, RocalTensorDataType::INT32);  // Create default labels Info

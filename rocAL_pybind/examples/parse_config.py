@@ -64,6 +64,13 @@ def parse_args():
                               help='--use_gpu to use gpu')
     common_group.add_argument('--no-rocal-gpu', dest='rocal-gpu', action="store_false",
                               help='--no-rocal-gpu to use cpu backend')
+    
+    common_group.add_argument('--one-hot-encode', action="store_true",
+                              help='--one-hot-encode: to use for one-hot-encoding of labels')
+    common_group.add_argument('--no-one-hot-encode', dest='one-hot-encode', action="store_false",
+                              help='--no-one-hot-encode: to used when we do not want to one hot encode the labels')
+    # case when none of the above is specified
+    parser.set_defaults(one_hot_encode=False)
 
     common_group.add_argument('--NHWC', action='store_true',
                               help='run input pipeline NHWC format')
@@ -98,6 +105,18 @@ def parse_args():
                                   help='interpolation type used for resize and crop')
     python_unit_test.add_argument('--scaling-mode', '-sm', type=int, default=0,
                                   help='scaling mode type used for resize')
+
+    # rocAL_api_audio_unittest.py related options
+    audio_unit_test = parser.add_argument_group(
+        'python-unittest', 'python-unittest-related options')
+    audio_unit_test.add_argument('--audio_path', type=str, default="",
+                                  help='audio files path')
+    audio_unit_test.add_argument('--file_list_path', type=str, default="",
+                                  help='file list path')
+    audio_unit_test.add_argument('--test_case', type=int, default=None,
+                                  help='test case')
+    audio_unit_test.add_argument('--qa_mode', type=int, default=1,
+                                  help='enable qa mode to compare audio output with ref outputs')
     # rocAL_api_coco_pipeline.py related options
     coco_pipeline = parser.add_argument_group(
         'coco-pipeline', 'coco-pipeline-related options')

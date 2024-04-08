@@ -20,15 +20,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include "file_source_reader.h"
-
-#include <commons.h>
-
-#include <algorithm>
-#include <boost/filesystem.hpp>
 #include <cassert>
-
-namespace filesys = boost::filesystem;
+#include <algorithm>
+#include <cstring>
+#include <commons.h>
+#include "file_source_reader.h"
+#include "filesystem.h"
 
 FileSourceReader::FileSourceReader() {
     _src_dir = nullptr;
@@ -55,6 +52,7 @@ Reader::Status FileSourceReader::initialize(ReaderConfig desc) {
     auto ret = Reader::Status::OK;
     _file_id = 0;
     _folder_path = desc.path();
+    _file_list_path = desc.file_list_path();
     _shard_id = desc.get_shard_id();
     _shard_count = desc.get_shard_count();
     _batch_count = desc.get_batch_size();
@@ -62,8 +60,9 @@ Reader::Status FileSourceReader::initialize(ReaderConfig desc) {
     _loop = desc.loop();
     _meta_data_reader = desc.meta_data_reader();
     _last_batch_info = desc.get_last_batch_policy();
+    _stick_to_shard = desc.get_stick_to_shard();
+    _shard_size = desc.get_shard_size();
     ret = subfolder_reading();
-
     // shuffle dataset if set
     if (ret == Reader::Status::OK && _shuffle)
         std::random_shuffle(_file_names.begin(), _file_names.end());
@@ -74,12 +73,14 @@ Reader::Status FileSourceReader::initialize(ReaderConfig desc) {
 void FileSourceReader::incremenet_read_ptr() {
     _read_counter++;
     _curr_file_idx = (_curr_file_idx + 1) % _file_names.size();
+    if (_last_batch_info.first == RocalBatchPolicy::DROP) {
+        if ((_file_names.size() / _batch_count) == _curr_file_idx)  // Check if its last batch
+        {
+            _curr_file_idx += _batch_count;
+            _curr_file_idx = (_curr_file_idx + 1) % _file_names.size();
+        }
+    }
 }
-
-size_t FileSourceReader::last_batch_padded_size() {
-    return _last_batch_padded_size;
-}
-
 size_t FileSourceReader::open() {
     auto file_path = _file_names[_curr_file_idx];  // Get next file name
     incremenet_read_ptr();
@@ -139,44 +140,123 @@ int FileSourceReader::release() {
 void FileSourceReader::reset() {
     if (_shuffle) std::random_shuffle(_file_names.begin(), _file_names.end());
     _read_counter = 0;
-    if (_last_batch_info.second == true)
+    _curr_file_idx = 0;
+    if (_stick_to_shard == true) {
         _curr_file_idx = 0;
+        if (_shard_size > 0) {
+            // Reset the variables
+            _last_batch_padded_size = _read_counter = _curr_file_idx = 0;
+            int read_start_index = 0;
+            if (_shard_size < _batch_count)
+                read_start_index = _batch_count;
+            else {
+                if (_shard_size % _batch_count)
+                    read_start_index = _shard_size;
+                else
+                    read_start_index = _shard_size + (_shard_size % _batch_count);
+            }
+            // To re-arrange the starting index of file-loading keeping in mind the shard_size and batch size
+            std::rotate(_file_names.begin(), _file_names.begin() + read_start_index, _file_names.end());
+        } else {
+            _curr_file_idx = 0;
+            _read_counter = 0;
+        }
+    } else if (_stick_to_shard == false && _shard_count > 1) {
+        // Reset the variables
+        _last_batch_padded_size = _in_batch_read_count = _curr_file_idx = _file_id = _read_counter = 0;
+        _file_names.clear();
+        increment_shard_id();
+        generate_file_names();  // generates the data from next shard in round-robin fashion after completion of an epoch
+        if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
+            // This is to pad within a batch in a shard. Need to change this according to fill / drop or partial.
+            // Adjust last batch only if the last batch padded is true.
+            replicate_last_image_to_fill_last_shard();
+            LOG("FileReader in reset function - Replicated " + _folder_path + _last_file_name + " " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
+        }
+        if (!_file_names.empty())
+            LOG("FileReader in reset function - Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
+    } else {
+        _curr_file_idx = 0;
+        _read_counter = 0;
+    }
 }
 
 void FileSourceReader::increment_shard_id() {
     _shard_id = (_shard_id + 1) % _shard_count;
 }
 
-Reader::Status FileSourceReader::subfolder_reading() {
+Reader::Status FileSourceReader::generate_file_names() {
+    if ((_sub_dir = opendir(_folder_path.c_str())) == nullptr)
+        THROW("FileReader ShardID [" + TOSTR(_shard_id) + "] ERROR: Failed opening the directory at " + _folder_path);
+
     std::vector<std::string> entry_name_list;
+    std::string _full_path = _folder_path;
+
+    while ((_entity = readdir(_sub_dir)) != nullptr) {
+        std::string entry_name(_entity->d_name);
+        if (strcmp(_entity->d_name, ".") == 0 || strcmp(_entity->d_name, "..") == 0) continue;
+        entry_name_list.push_back(entry_name);
+    }
+    closedir(_sub_dir);
+    std::sort(entry_name_list.begin(), entry_name_list.end());
+
     auto ret = Reader::Status::OK;
-    for (auto& entry : filesys::recursive_directory_iterator(_folder_path.c_str())) {
-        try {
-            std::string entry_path = entry.path().string();
-            auto entry_path_id = entry_path;
-            auto last_slash_idx = entry_path_id.find_last_of("\\/");
-            if (std::string::npos != last_slash_idx) {
-                entry_path_id.erase(0, last_slash_idx + 1);
-            }
-            if (filesys::is_regular_file(entry.path())) {
-                if (!_meta_data_reader || _meta_data_reader->exists(entry_path_id)) {
-                    if (get_file_shard_id() != _shard_id) {
+    if (!_file_list_path.empty()) {  // Reads the file paths from the file list and adds to file_names vector for decoding
+        std::ifstream fp(_file_list_path);
+        if (fp.is_open()) {
+            while (fp) {
+                std::string file_label_path;
+                std::getline(fp, file_label_path);
+                std::istringstream ss(file_label_path);
+                std::string file_path;
+                std::getline(ss, file_path, ' ');
+                if (filesys::path(file_path).is_relative()) {  // Only add root path if the file list contains relative file paths
+                    if (!filesys::exists(_folder_path))
+                        THROW("File list contains relative paths but root path doesn't exists");
+                    file_path = _folder_path + "/" + file_path;
+                }
+                std::string file_name = file_path.substr(file_path.find_last_of("/\\") + 1);
+
+                if (!_meta_data_reader || _meta_data_reader->exists(file_name)) {  // Check if the file is present in metadata reader and add to file names list, to avoid issues while lookup
+                    if (filesys::is_regular_file(file_path)) {
+                        if (get_file_shard_id() != _shard_id) {
+                            _file_count_all_shards++;
+                            incremenet_file_id();
+                            continue;
+                        }
+                        _in_batch_read_count++;
+                        _in_batch_read_count = (_in_batch_read_count % _batch_count == 0) ? 0 : _in_batch_read_count;
+                        _last_file_name = file_path;
+                        _file_names.push_back(file_path);
                         _file_count_all_shards++;
                         incremenet_file_id();
-                        continue;
                     }
-                    _in_batch_read_count++;
-                    _in_batch_read_count = (_in_batch_read_count % _batch_count == 0) ? 0 : _in_batch_read_count;
-                    std::string file_path = entry_path;
-                    _last_file_name = file_path;
-                    _file_names.push_back(file_path);
-                    _file_count_all_shards++;
-                    incremenet_file_id();
+                } else {
+                    WRN("Skipping file," + std::string(file_path) + " as it is not present in metadata reader")
                 }
             }
-        } catch (const boost::filesystem::filesystem_error& ex) {
-            if (ex.code() == boost::system::errc::permission_denied)
-                THROW("Permission denied for directory: " + entry.path().string());
+        }
+    } else {
+        for (unsigned dir_count = 0; dir_count < entry_name_list.size(); ++dir_count) {
+            std::string subfolder_path = _full_path + "/" + entry_name_list[dir_count];
+            filesys::path pathObj(subfolder_path);
+            if (filesys::exists(pathObj) && filesys::is_regular_file(pathObj)) {
+                // ignore files with non-image extensions
+                auto file_extension_idx = subfolder_path.find_last_of(".");
+                if (file_extension_idx != std::string::npos) {
+                    std::string file_extension = subfolder_path.substr(file_extension_idx + 1);
+                    std::transform(file_extension.begin(), file_extension.end(), file_extension.begin(),
+                                   [](unsigned char c) { return std::tolower(c); });
+                    if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp") && (file_extension != "wav"))
+                        continue;
+                }
+                ret = open_folder();
+                break;  // assume directory has only files.
+            } else if (filesys::exists(pathObj) && filesys::is_directory(pathObj)) {
+                _folder_path = subfolder_path;
+                if (open_folder() != Reader::Status::OK)
+                    WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] File reader cannot access the storage at " + _folder_path);
+            }
         }
     }
 
@@ -198,16 +278,38 @@ Reader::Status FileSourceReader::subfolder_reading() {
         }
     }
 
+    return ret;
+}
+
+Reader::Status FileSourceReader::subfolder_reading() {
+    auto ret = generate_file_names();
+
     if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
+        // This is to pad within a batch in a shard. Need to change this according to fill / drop or partial.
+        // Adjust last batch only if the last batch padded is true.
         replicate_last_image_to_fill_last_shard();
         LOG("FileReader ShardID [" + TOSTR(_shard_id) + "] Replicated " + _folder_path + _last_file_name + " " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
     }
+
     if (!_file_names.empty())
         LOG("FileReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
     return ret;
 }
+
 void FileSourceReader::replicate_last_image_to_fill_last_shard() {
-    if (_last_batch_info.first == RocalBatchPolicy::BATCH_FILL || _last_batch_info.first == RocalBatchPolicy::PARTIAL) {
+    if (_last_batch_info.first == RocalBatchPolicy::FILL) {
+        if (_last_batch_info.second == true) {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++)
+                _file_names.push_back(_last_file_name);
+        } else {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++)
+                _file_names.push_back(_file_names.at(i));
+        }
+    } else if (_last_batch_info.first == RocalBatchPolicy::DROP) {
+        for (size_t i = 0; i < _in_batch_read_count; i++)
+            _file_names.pop_back();
+    } else if (_last_batch_info.first == RocalBatchPolicy::PARTIAL) {
+        _last_batch_padded_size = _batch_count - _in_batch_read_count;
         if (_last_batch_info.second == true) {
             for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++)
                 _file_names.push_back(_last_file_name);
@@ -216,9 +318,6 @@ void FileSourceReader::replicate_last_image_to_fill_last_shard() {
                 _file_names.push_back(_file_names.at(i));
         }
     }
-
-    if (_last_batch_info.first == RocalBatchPolicy::PARTIAL)
-        _last_batch_padded_size = _batch_count - _in_batch_read_count;
 }
 
 void FileSourceReader::replicate_last_batch_to_pad_partial_shard() {
@@ -242,26 +341,31 @@ Reader::Status FileSourceReader::open_folder() {
             std::string file_extension = filename.substr(file_extension_idx + 1);
             std::transform(file_extension.begin(), file_extension.end(), file_extension.begin(),
                            [](unsigned char c) { return std::tolower(c); });
-            if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp"))
+            if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp") && (file_extension != "wav"))
                 continue;
         }
-        if (get_file_shard_id() != _shard_id) {
+        if (!_meta_data_reader || _meta_data_reader->exists(_entity->d_name)) { // Check if the file is present in metadata reader and add to file names list, to avoid issues while lookup
+            if (get_file_shard_id() != _shard_id) {
+                _file_count_all_shards++;
+                incremenet_file_id();
+                continue;
+            }
+            _in_batch_read_count++;
+            _in_batch_read_count = (_in_batch_read_count % _batch_count == 0) ? 0 : _in_batch_read_count;
+            std::string file_path = _folder_path;
+            file_path.append("/");
+            file_path.append(_entity->d_name);
+            _file_names.push_back(file_path);
             _file_count_all_shards++;
             incremenet_file_id();
-            continue;
+        } else {
+            WRN("Skipping file," + std::string(_entity->d_name) + " as it is not present in metadata reader")
         }
-        _in_batch_read_count++;
-        _in_batch_read_count = (_in_batch_read_count % _batch_count == 0) ? 0 : _in_batch_read_count;
-        std::string file_path = _folder_path;
-        file_path.append("/");
-        file_path.append(_entity->d_name);
-        _last_file_name = file_path;
-        _file_names.push_back(file_path);
-        _file_count_all_shards++;
-        incremenet_file_id();
     }
     if (_file_names.empty())
-        WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] Did not load any file from " + _folder_path)
+        ERR("FileReader ShardID [" + TOSTR(_shard_id) + "] Did not load any file from " + _folder_path)
+    std::sort(_file_names.begin(), _file_names.end());
+    _last_file_name = _file_names[_file_names.size() - 1];
 
     closedir(_src_dir);
     return Reader::Status::OK;
@@ -271,4 +375,8 @@ size_t FileSourceReader::get_file_shard_id() {
     if (_batch_count == 0 || _shard_count == 0)
         THROW("Shard (Batch) size cannot be set to 0")
     return _file_id % _shard_count;
+}
+
+size_t FileSourceReader::last_batch_padded_size() {
+    return _last_batch_padded_size;
 }

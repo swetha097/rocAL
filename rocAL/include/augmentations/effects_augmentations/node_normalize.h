@@ -21,35 +21,26 @@ THE SOFTWARE.
 */
 
 #pragma once
-#include <dirent.h>
+#include "graph.h"
+#include "node.h"
+#include "parameter_vx.h"
 
-#include <map>
-
-#include "commons.h"
-#include "meta_data.h"
-#include "meta_data_reader.h"
-
-class LabelReaderFileList : public MetaDataReader {
+class NormalizeNode : public Node {
    public:
-    void init(const MetaDataConfig& cfg, pMetaDataBatch meta_data_batch) override;
-    void lookup(const std::vector<std::string>& image_names) override;
-    void read_all(const std::string& path) override;
-    void release(std::string image_name);
-    void release() override;
-    void print_map_contents();
-    bool set_timestamp_mode() override { return false; }
-    const std::map<std::string, std::shared_ptr<MetaData>>& get_map_content() override { return _map_content; }
-    LabelReaderFileList();
+    NormalizeNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
+    NormalizeNode() = delete;
+    void init(std::vector<unsigned> &axes, std::vector<float> &mean, std::vector<float> &std_dev, float scale, float shift);
+
+   protected:
+    void create_node() override;
+    void update_node() override{};
 
    private:
-    bool exists(const std::string& image_name) override;
-    void add(std::string image_name, int label);
-    std::map<std::string, std::shared_ptr<MetaData>> _map_content;
-    std::map<std::string, std::shared_ptr<MetaData>>::iterator _itr;
-    std::string _path, _file_list_path;
-    pMetaDataBatch _output;
-    DIR *_src_dir, *_sub_dir;
-    struct dirent* _entity;
-    std::vector<std::string> _file_names;
-    std::vector<std::string> _subfolder_file_names;
+    int _axis_mask = 0;
+    uint _compute_mean, _compute_stddev;
+    vx_array _mean_vx_array, _stddev_vx_array;
+    std::vector<unsigned> _axes;
+    std::vector<float> _mean, _std_dev;
+    float _scale, _shift;
+    std::vector<std::vector<uint32_t>> _normalize_roi;
 };

@@ -77,8 +77,6 @@ vx_enum interpret_tensor_data_type(RocalTensorDataType data_type) {
             return VX_TYPE_FLOAT16;
         case RocalTensorDataType::UINT8:
             return VX_TYPE_UINT8;
-        case RocalTensorDataType::INT8:
-            return VX_TYPE_INT8;
         case RocalTensorDataType::INT32:
             return VX_TYPE_INT32;
         default:
@@ -123,7 +121,6 @@ void TensorInfo::reset_tensor_roi_buffers() {
             roi[i].xywh.h = _max_shape.at(1);
         }
     } else {
-        // TODO - For other tensor types
         for (unsigned i = 0; i < _batch_size; i++) {
             unsigned *tensor_shape = _roi[i].end;
             for (unsigned j = 0; j < _max_shape.size(); j++)
@@ -134,7 +131,7 @@ void TensorInfo::reset_tensor_roi_buffers() {
 
 void TensorInfo::reallocate_tensor_sample_rate_buffers() {
     if (_is_image)
-        THROW("No sample rate available for Image data")
+        THROW("Sample rate not available for Image data")
     _sample_rates = std::make_shared<std::vector<float>>(_batch_size);
 }
 
@@ -450,20 +447,20 @@ unsigned Tensor::copy_data(void *user_buffer, RocalOutputMemType external_mem_ty
     return 0;
 }
 
-unsigned Tensor::copy_data(void *user_buffer, uint max_cols, uint max_rows) {
+unsigned Tensor::copy_data(void *user_buffer, uint max_rows, uint max_cols) {
     if (_mem_handle == nullptr) return 0;
     // TODO : Handle this case for HIP buffer
-    auto max_shape_rows = _info.max_shape().at(0);
+    auto max_shape_rows = _info.max_shape().at(1);
     auto dtype_size = _info.data_type_size();
     auto num_of_bytes_max_rows = max_shape_rows * dtype_size;
-    auto src_stride = (_info.max_shape().at(1) * num_of_bytes_max_rows);
-    auto num_of_bytes_rows = max_rows * dtype_size;
-    auto dst_stride = (max_cols * num_of_bytes_rows);
+    auto src_stride = (_info.max_shape().at(0) * num_of_bytes_max_rows);
+    auto num_of_bytes_rows = max_cols * dtype_size;
+    auto dst_stride = (max_rows * num_of_bytes_rows);
 
     for (uint i = 0; i < _info._batch_size; i++) {
         auto temp_src_ptr = static_cast<unsigned char *>(_mem_handle) + i * src_stride;
         auto temp_dst_ptr = static_cast<unsigned char *>(user_buffer) + i * dst_stride;
-        for (uint height = 0; height < max_cols; height++) {
+        for (uint height = 0; height < max_rows; height++) {
             memcpy(temp_dst_ptr, temp_src_ptr, num_of_bytes_rows);
             temp_src_ptr += num_of_bytes_max_rows;
             temp_dst_ptr += num_of_bytes_rows;

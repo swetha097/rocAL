@@ -1,4 +1,4 @@
-# Copyright (c) 2018 - 2024 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (c) 2018 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,7 +26,6 @@
 import rocal_pybind as b
 import amd.rocal.types as types
 import numpy as np
-import cupy as cp
 import ctypes
 import functools
 import inspect
@@ -125,8 +124,8 @@ class Pipeline(object):
         self._external_source = None
         self._external_source_mode = None
         self._last_batch_policy = last_batch_policy
-        self.last_batch_padded = last_batch_padded
-        self.shard_size = -1
+        self._last_batch_padded = last_batch_padded
+        self._shard_size = -1
 
     def build(self):
         """!Build the pipeline using rocalVerify call
@@ -157,19 +156,8 @@ class Pipeline(object):
         b.rocalToTensor(self._handle, ctypes.c_void_p(array.data_ptr()), tensor_format, tensor_dtype,
                         multiplier[0], multiplier[1], multiplier[2], offset[0], offset[1], offset[2], (1 if reverse_channels else 0), self._output_memory_type, max_roi_height, max_roi_width)
 
-    def get_one_hot_encoded_labels(self, array, device):
-        if device == "cpu":
-            if (isinstance(array, np.ndarray)):
-                b.getOneHotEncodedLabels(self._handle, array.ctypes.data_as(
-                    ctypes.c_void_p), self._num_classes, 0)
-            else:  # torch tensor
-                return b.getOneHotEncodedLabels(self._handle, ctypes.c_void_p(array.data_ptr()), self._num_classes, 0)
-        else:
-            if (isinstance(array, cp.ndarray)):
-                b.getCupyOneHotEncodedLabels(
-                    self._handle, array.data.ptr, self._num_classes, 1)
-            else:  # torch tensor
-                return b.getOneHotEncodedLabels(self._handle, ctypes.c_void_p(array.data_ptr()), self._num_classes, 1)
+    def get_one_hot_encoded_labels(self, array_ptr, dest_device_type):
+            b.getOneHotEncodedLabels(self._handle, array_ptr, self._num_classes, dest_device_type)
 
     def set_outputs(self, *output_list):
         b.setOutputs(self._handle, len(output_list), output_list)

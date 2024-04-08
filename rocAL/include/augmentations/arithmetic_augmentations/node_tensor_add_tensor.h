@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2024 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,20 +21,16 @@ THE SOFTWARE.
 */
 
 #pragma once
-#include "node.h"
 #include "graph.h"
+#include "node.h"
+#include "rocal_api_types.h"
 
-class NonSilentRegionNode : public Node {
-public:
-    NonSilentRegionNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
-    NonSilentRegionNode() = delete;
-    void init(float cutoff_db, float reference_power, int reset_interval, int window_length);
-protected:
+class TensorAddTensorNode : public Node {
+   public:
+    TensorAddTensorNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
+    TensorAddTensorNode() = delete;
+
+   protected:
     void create_node() override;
     void update_node() override;
-private:
-    float _cutoff_db = -60.0;
-    float _reference_power = 0.0;
-    int _window_length = 2048;
-    int _reset_interval = 8192;
 };

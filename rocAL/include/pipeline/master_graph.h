@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2024 Advanced Micro Devices, Inc. All rights reserved.
+Copyright (c) 2019 - 2023 Advanced Micro Devices, Inc. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,8 +37,10 @@ THE SOFTWARE.
 #include "node_image_loader_single_shard.h"
 #include "node_video_loader.h"
 #include "node_video_loader_single_shard.h"
+#ifdef ROCAL_AUDIO
 #include "node_audio_loader.h"
 #include "node_audio_loader_single_shard.h"
+#endif
 #include "ring_buffer.h"
 #include "timing_debug.h"
 #if ENABLE_HIP
@@ -104,6 +106,7 @@ class MasterGraph {
     bool last_batch_padded();
     uint last_batch_padded_size();
     void release();
+    vx_context get_vx_context() { return _context; }
     template <typename T>
     std::shared_ptr<T> add_node(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
     template <typename T, typename M>
@@ -359,6 +362,7 @@ inline std::shared_ptr<Cifar10LoaderNode> MasterGraph::add_node(const std::vecto
     return node;
 }
 
+#ifdef ROCAL_VIDEO
 /*
  * Explicit specialization for VideoLoaderNode
  */
@@ -397,7 +401,9 @@ inline std::shared_ptr<VideoLoaderSingleShardNode> MasterGraph::add_node(const s
 
     return node;
 }
+#endif
 
+#ifdef ROCAL_AUDIO
 /*
  * Explicit specialization for AudioLoaderNode
  */
@@ -434,3 +440,4 @@ template<> inline std::shared_ptr<AudioLoaderSingleShardNode> MasterGraph::add_n
 
     return node;
 }
+#endif

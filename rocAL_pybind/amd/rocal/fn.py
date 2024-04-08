@@ -1085,32 +1085,20 @@ def preemphasis_filter(*inputs, border=types.CLAMP, preemph_coeff=0.97, output_d
     kwargs_pybind = {"input_audio0": inputs[0], "is_output": False,
                     "preemph_coeff": preemph_coeff_float_param, "preemph_border_type": border,
                     "output_dtype" :output_dtype}
-    preemphasis_output = b.PreEmphasisFilter(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    preemphasis_output = b.preEmphasisFilter(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
     return (preemphasis_output)
 
-def nonsilent_region(*inputs, rocal_tensor_output_type = types.FLOAT, bytes_per_sample_hint = [0], cutoff_db = -60, reference_power = 0.0, reset_interval = 8192, seed = -1, window_length = 2048):
-    """
-    Performs leading and trailing silence detection in an audio buffer.
-    The operator returns the beginning and length of the non-silent region by comparing the short term power calculated for window_length of the signal with a silence cut-off threshold. The signal is considered to be silent when the short_term_power_db is less than the cutoff_db. where:
-    short_term_power_db = 10 * log10( short_term_power / reference_power )
-    Unless specified otherwise, reference_power is the maximum power of the signal.
-    """
-    kwargs_pybind = {"input_audio0": inputs[0], "is_output": False, "cutoff_db": cutoff_db,
-                     "reference_power": reference_power, "reset_interval": reset_interval, "window_length": window_length}
-    non_silent_region_output = b.NonSilentRegion(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
-    return non_silent_region_output
-
 def spectrogram(*inputs, bytes_per_sample_hint = [0], center_windows = True, layout = types.FT, nfft = None, power = 2, reflect_padding = True, seed = -1, window_fn = [], window_length = 512, window_step = 256, rocal_tensor_output_type = types.FLOAT) :
-    '''
-    Produces a spectrogram from a 1D signal (for example, audio).
-    Input data is expected to be one channel (shape being (nsamples,), (nsamples, 1), or (1, nsamples)) of type float32.
-    '''
-    kwargs_pybind = {"input_audio0": inputs[0], "is_output": False, "window_fn": window_fn, "center_windows": center_windows, "reflect_padding": reflect_padding,
+    """
+    Produces a spectrogram from a 1D signal.
+    Input data is expected to be one channel - The shape of the input can be (srcLength, 1) of the data type float32.
+    """
+    kwargs_pybind = {"input_audio": inputs[0], "is_output": False, "window_fn": window_fn, "center_windows": center_windows, "reflect_padding": reflect_padding,
                      "layout": layout, "power": power, "nfft": nfft, "window_length": window_length, "window_step": window_step, "rocal_tensor_output_type": rocal_tensor_output_type}
-    spectrogram_output = b.Spectrogram(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
-    return spectrogram_output
+    spectrogram_output = b.spectrogram(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return (spectrogram_output)
 
-def to_decibels(*inputs, bytes_per_sample_hint = [0], cutoff_db = -200.0, multiplier = 10.0, reference = 0.0, seed = -1, rocal_tensor_output_type = types.FLOAT):
+def to_decibels(*inputs, bytes_per_sample_hint = [0], cutoff_db = -200.0, multiplier = 10.0, reference = 0.0, seed = -1, output_dtype = types.FLOAT):
     '''
     Converts a magnitude (real, positive) to the decibel scale.
 
@@ -1119,23 +1107,83 @@ def to_decibels(*inputs, bytes_per_sample_hint = [0], cutoff_db = -200.0, multip
     min_ratio = pow(10, cutoff_db / multiplier)
     out[i] = multiplier * log10( max(min_ratio, input[i] / reference) )
     '''
-    kwargs_pybind = {"input_audio0": inputs[0], "is_output": False, "cutoff_DB": cutoff_db, "multiplier": multiplier, "reference_magnitude": reference, "rocal_tensor_output_type": rocal_tensor_output_type}
-    decibel_scale = b.ToDecibels(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    kwargs_pybind = {"input_audio": inputs[0], "is_output": False, "cutoff_db": cutoff_db, "multiplier": multiplier, "reference_magnitude": reference, "rocal_tensor_output_type": output_dtype}
+    decibel_scale = b.toDecibels(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return decibel_scale
 
-def normalize(*inputs, axes = [], axis_names = "", batch = False, bytes_per_sample_hint = [0], ddof = 0, epsilon = 0.0, mean = 0.0, scale = 1.0, seed = -1, shift = 0.0, stddev = 0.0, rocal_tensor_output_type=types.FLOAT):
+def resample(*inputs, resample_rate=None, output_datatype=types.FLOAT, resample_hint=-1, quality=50.0):
+    """
+    Resamples an audio signal.
+
+    The resampling is achieved by applying a sinc filter with Hann window with an extent controlled by the quality argument.
+    """
+    kwargs_pybind = {"input_audio": inputs[0], "resample_rate": resample_rate, "is_output": False, "resample_hint": resample_hint, "quality": quality, "output_datatype": output_datatype}
+    resample_output = b.resample(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    return resample_output
+
+def tensor_add_tensor_float(*inputs, output_datatype=types.FLOAT):
+    """
+    Adds a rocalTensor with another rocalTensor.
+    """
+    kwargs_pybind = {"input_audio": inputs[0], "input_image1": inputs[1], "is_output": False, "output_datatype": output_datatype}
+    tensor_add_tensor_float = b.tensorAddTensor(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    return tensor_add_tensor_float
+
+def tensor_mul_scalar_float(*inputs, scalar=1.0, output_datatype=types.FLOAT):
+    """
+    Multiplies a rocalTensor with a scalar float value.
+    """
+    kwargs_pybind = {"input_audio": inputs[0], "is_output": False, "scalar": scalar, "output_datatype": output_datatype}
+    tensor_mul_scalar_float = b.tensorMulScalar(Pipeline._current_pipeline._handle ,*(kwargs_pybind.values()))
+    return tensor_mul_scalar_float
+
+def nonsilent_region(*inputs, cutoff_db = -60, reference_power = 0.0, reset_interval = 8192, window_length = 2048):
+    """
+    Performs leading and trailing silence detection in an audio buffer.
+    @param cutoff_db (float)                                      The threshold, in dB, below which the signal is considered silent.
+    @param reference_power (float)                                The reference power that is utilized to convert the signal to dB.
+    @param reset_interval (int)                                   The number of samples after which the moving mean average is recalculated aiming to avoid loss of precision.
+    @param window_length (int)                                    Size of the sliding window used in calculating the short-term power of the signal.
+    """
+    kwargs_pybind = {"input_audio": inputs[0], "is_output": False, "cutoff_db": cutoff_db,
+                     "reference_power": reference_power, "reset_interval": reset_interval, "window_length": window_length}
+    non_silent_region_output = b.nonSilentRegionDetection(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return non_silent_region_output
+
+def slice(*inputs, anchor = [], shape = [], fill_values = [0.0],  out_of_bounds_policy = types.ERROR, rocal_tensor_output_type = types.FLOAT):
+    """
+    The slice can be specified by proving the start and end coordinates, or start coordinates and shape of the slice. Both coordinates and shapes can be provided in absolute or relative terms.
+    @param anchor (int or 1D RocalTensor of ints)                                      The absolute starting co-ordinate points of the slice.
+    @param shape (int or 1D RocalTensor of ints)                                       The absolute co-ordinate for the dimensions of the slice.
+    @param fill_values (float or list of float)                                        Determines the padding values and is only relevant if out_of_bounds_policy is “pad” policy.
+    @param out_of_bounds_policy ("error", "pad", "trim_to_shape")                      Determines the policy when slicing the out of bounds area of the input.
+    @param rocal_tensor_output_type (float)                                            Output DataType of the Tensor
+    """
+
+    kwargs_pybind = {"input_audio0": inputs[0], "is_output": False, "anchor": anchor[0], "shape": shape[0], "fill_values": fill_values,
+                     "out_of_bounds_policy": out_of_bounds_policy, "rocal_tensor_output_type": rocal_tensor_output_type}
+    slice_output = b.slice(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return slice_output
+
+def normalize(*inputs, axes=[], mean=[], stddev=[], scale=1.0, shift=0.0, output_datatype=types.FLOAT):
     '''
     Normalizes the input by removing the mean and dividing by the standard deviation.
-
     The mean and standard deviation can be calculated internally for the specified subset of axes or can be externally provided as the mean and stddev arguments.
-
     The normalization is done following the formula:
-
     out = scale * (in - mean) / stddev + shift
-
     The formula assumes that out and in are equally shaped tensors, but mean and stddev might be either tensors of same shape, scalars, or a mix of these.
     '''
-    kwargs_pybind = {"input_audio0": inputs[0], "is_output": False, "batch": batch, "axes": axes, "mean": mean, "stddev": stddev,
-                     "scale": scale , "shift": shift, "ddof": ddof , "epsilon": epsilon, "rocal_tensor_output_type": rocal_tensor_output_type}
-    normalize_output = b.audioNormalize(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    kwargs_pybind = {"input_tensor": inputs[0], "axes": axes, "mean": mean, "stddev": stddev, "is_output": False,
+                     "scale": scale, "shift": shift, "output_datatype": output_datatype}
+    normalize_output = b.normalize(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return normalize_output
+
+def mel_filter_bank(*inputs, bytes_per_sample_hint = [0], freq_high = 0.0, freq_low = 0.0, mel_formula = types.SLANEY, nfilter = 128, normalize = True, sample_rate = 44100.0, seed = -1, output_datatype = types.FLOAT):
+    '''
+    Converts a spectrogram to a mel spectrogram by applying a bank of triangular filters.
+    The frequency ('f') dimension is selected from the input layout. In case of no layout, “f”, “ft”, or “*ft” is assumed, depending on the number of dimensions.
+    '''
+    kwargs_pybind = {"input_audio": inputs[0], "is_output": False, "freq_high": freq_high, "freq_low": freq_low, "mel_formula": mel_formula,
+                     "nfilter": nfilter, "normalize": normalize, "sample_rate": sample_rate, "output_datatype": output_datatype}
+    mel_filter_bank_output = b.melFilterBank(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return mel_filter_bank_output

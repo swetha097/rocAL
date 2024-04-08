@@ -21,14 +21,18 @@ THE SOFTWARE.
 */
 
 #pragma once
+#include <random>
+
+#include "batch_rng.h"
 #include "graph.h"
 #include "node.h"
 
-class NormalizeNode : public Node {
+class NormalDistributionNode : public Node {
    public:
-    NormalizeNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
-    NormalizeNode() = delete;
-    void init(float mean, float std_dev, std::vector<int> axes, bool batch, float scale, float shift, int ddof, float epsilon);
+    NormalDistributionNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
+    NormalDistributionNode() = delete;
+    void init(float mean, float stddev);
+    void update_param();
 
    protected:
     void create_node() override;
@@ -36,11 +40,7 @@ class NormalizeNode : public Node {
 
    private:
     float _mean, _std_dev;
-    float _scale = 1.0;
-    float _shift = 0.0;
-    float _epsilon = 0.0;
-    int _ddof = 0;
-    int _axis_mask = 0;
-    bool _batch = false;
-    unsigned _num_of_dims;
+    std::normal_distribution<float> _dist_normal;
+    std::vector<float> _normal_distribution_array;
+    BatchRNG<std::mt19937> _rngs = {89, 2};  // Random Seed & BatchSize for initialization
 };

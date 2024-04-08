@@ -74,6 +74,7 @@ class FileSourceReader : public Reader {
     Reader::Status open_folder();
     Reader::Status subfolder_reading();
     std::string _folder_path;
+    std::string _file_list_path;
     DIR *_src_dir;
     DIR *_sub_dir;
     struct dirent *_entity;
@@ -85,6 +86,7 @@ class FileSourceReader : public Reader {
     std::string _last_file_name, _last_file_path;
     size_t _shard_id = 0;
     size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     //!< _batch_count Defines the quantum count of the images to be read. It's usually equal to the user's batch size.
     /// The loader will repeat images if necessary to be able to have images available in multiples of the load_batch_count,
     /// for instance if there are 10 images in the dataset and _batch_count is 3, the loader repeats 2 images as if there are 12 images available.
@@ -106,4 +108,10 @@ class FileSourceReader : public Reader {
     size_t _last_batch_padded_size = 0;
     void increment_shard_id(); //!< Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
     std::shared_ptr<MetaDataReader> _meta_data_reader = nullptr;
+    std::pair<RocalBatchPolicy, bool>  _last_batch_info;
+    size_t _last_batch_padded_size = 0;
+    bool _stick_to_shard = false;
+    Reader::Status generate_file_names();
+    //!<// Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
+    void increment_shard_id();
 };
