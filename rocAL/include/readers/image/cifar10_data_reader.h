@@ -64,6 +64,8 @@ class CIFAR10DataReader : public Reader {
 
     unsigned get_file_index() { return _last_file_idx; }
 
+    size_t last_batch_padded_size() override;
+
    private:
     //! opens the folder containing the images
     Reader::Status open_folder();
@@ -80,6 +82,9 @@ class CIFAR10DataReader : public Reader {
     unsigned _current_file_size;
     std::string _last_id;
     std::string _last_file_name;
+    size_t _shard_id = 0;
+    size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     unsigned _last_file_idx;  // index of individual raw file in a batched file
     // hard_coding the following for now. Eventually needs to add in the ReaderConfig
     //!< file_name_prefix tells the reader to read only files with the prefix:: eventually needs to be passed through ReaderConfig
@@ -97,5 +102,11 @@ class CIFAR10DataReader : public Reader {
     int _read_counter = 0;
     void incremenet_read_ptr();
     int release();
+    std::pair<RocalBatchPolicy, bool>  _last_batch_info;
+    size_t _last_batch_padded_size = 0;
+    bool _stick_to_shard = false;
+    Reader::Status generate_file_names();
+    //!<// Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
+    void increment_shard_id();
     void incremenet_file_id() { _file_id++; }
 };
