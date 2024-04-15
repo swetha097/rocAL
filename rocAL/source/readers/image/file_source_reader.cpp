@@ -331,20 +331,23 @@ Reader::Status FileSourceReader::open_folder() {
     if ((_src_dir = opendir(_folder_path.c_str())) == nullptr)
         THROW("FileReader ShardID [" + TOSTR(_shard_id) + "] ERROR: Failed opening the directory at " + _folder_path);
 
-    while ((_entity = readdir(_src_dir)) != nullptr) {
-        if (_entity->d_type != DT_REG)
+    std::vector<filesys::path> files_in_directory;
+    std::copy(filesys::directory_iterator(filesys::path(_folder_path)), filesys::directory_iterator(), std::back_inserter(files_in_directory));
+    std::sort(files_in_directory.begin(), files_in_directory.end());
+    for (const std::string file_path : files_in_directory) {
+        std::string filename = file_path.substr(file_path.find_last_of("/\\") + 1);
+        if (!filesys::is_regular_file(filesys::path(file_path)))
             continue;
 
-        std::string filename(_entity->d_name);
-        auto file_extension_idx = filename.find_last_of(".");
+        auto file_extension_idx = file_path.find_last_of(".");
         if (file_extension_idx != std::string::npos) {
-            std::string file_extension = filename.substr(file_extension_idx + 1);
+            std::string file_extension = file_path.substr(file_extension_idx + 1);
             std::transform(file_extension.begin(), file_extension.end(), file_extension.begin(),
                            [](unsigned char c) { return std::tolower(c); });
             if ((file_extension != "jpg") && (file_extension != "jpeg") && (file_extension != "png") && (file_extension != "ppm") && (file_extension != "bmp") && (file_extension != "pgm") && (file_extension != "tif") && (file_extension != "tiff") && (file_extension != "webp") && (file_extension != "wav"))
                 continue;
         }
-        if (!_meta_data_reader || _meta_data_reader->exists(_entity->d_name)) { // Check if the file is present in metadata reader and add to file names list, to avoid issues while lookup
+        if (!_meta_data_reader || _meta_data_reader->exists(filename)) {  // Check if the file is present in metadata reader and add to file names list, to avoid issues while lookup
             if (get_file_shard_id() != _shard_id) {
                 _file_count_all_shards++;
                 incremenet_file_id();
@@ -352,14 +355,11 @@ Reader::Status FileSourceReader::open_folder() {
             }
             _in_batch_read_count++;
             _in_batch_read_count = (_in_batch_read_count % _batch_count == 0) ? 0 : _in_batch_read_count;
-            std::string file_path = _folder_path;
-            file_path.append("/");
-            file_path.append(_entity->d_name);
             _file_names.push_back(file_path);
             _file_count_all_shards++;
             incremenet_file_id();
         } else {
-            WRN("Skipping file," + std::string(_entity->d_name) + " as it is not present in metadata reader")
+            WRN("Skipping file," + std::string(filename) + " as it is not present in metadata reader")
         }
     }
     if (_file_names.empty())
