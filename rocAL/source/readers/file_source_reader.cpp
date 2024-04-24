@@ -418,6 +418,7 @@ size_t FileSourceReader::get_file_shard_id() {
 size_t FileSourceReader::last_batch_padded_size() {
     return _last_batch_padded_size;
 }
+
 std::string FileSourceReader::get_root_folder_path() {
     return _folder_path;
 }
@@ -430,3 +431,4 @@ std::vector<std::string> FileSourceReader::get_file_paths_from_meta_data_reader(
         return {};
     }
 }
+

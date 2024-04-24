@@ -21,7 +21,6 @@ THE SOFTWARE.
 */
 
 #include "readers/image/caffe_lmdb_record_reader.h"
-
 #include "pipeline/commons.h"
 #include <iostream>
 #include <sstream>
@@ -31,8 +30,7 @@ THE SOFTWARE.
 using namespace std;
 using caffe_protos::Datum;
 
-CaffeLMDBRecordReader::CaffeLMDBRecordReader()
-{
+CaffeLMDBRecordReader::CaffeLMDBRecordReader() {
     _sub_dir = nullptr;
     _curr_file_idx = 0;
     _current_file_size = 0;
@@ -62,16 +60,11 @@ Reader::Status CaffeLMDBRecordReader::initialize(ReaderConfig desc) {
     _loop = desc.loop();
     _shuffle = desc.shuffle();
     _meta_data_reader = desc.meta_data_reader();
+    _last_batch_info = desc.get_last_batch_policy();
+    _stick_to_shard = desc.get_stick_to_shard();
+    _shard_size = desc.get_shard_size();
     ret = folder_reading();
-    // the following code is required to make every shard the same size:: required for multi-gpu training
-    if (_shard_count > 1 && _batch_count > 1) {
-        int _num_batches = _file_names.size() / _batch_count;
-        int max_batches_per_shard = (_file_count_all_shards + _shard_count - 1) / _shard_count;
-        max_batches_per_shard = (max_batches_per_shard + _batch_count - 1) / _batch_count;
-        if (_num_batches < max_batches_per_shard) {
-            replicate_last_batch_to_pad_partial_shard();
-        }
-    }
+
     // shuffle dataset if set
     if (ret == Reader::Status::OK && _shuffle)
         std::random_shuffle(_file_names.begin(), _file_names.end());
@@ -83,6 +76,11 @@ void CaffeLMDBRecordReader::incremenet_read_ptr() {
     _read_counter++;
     _curr_file_idx = (_curr_file_idx + 1) % _file_names.size();
 }
+
+size_t CaffeLMDBRecordReader::last_batch_padded_size() {
+    return _last_batch_padded_size;
+}
+
 size_t CaffeLMDBRecordReader::open() {
     auto file_path = _file_names[_curr_file_idx];  // Get next file name
     _last_id = file_path;
@@ -123,10 +121,51 @@ int CaffeLMDBRecordReader::release() {
 }
 
 void CaffeLMDBRecordReader::reset() {
-    if (_shuffle)
-        std::random_shuffle(_file_names.begin(), _file_names.end());
+    if (_shuffle) std::random_shuffle(_file_names.begin(), _file_names.end());
     _read_counter = 0;
     _curr_file_idx = 0;
+    if (_stick_to_shard == true) {
+        _curr_file_idx = 0;
+        if (_shard_size > 0) {
+            // Reset the variables
+            _last_batch_padded_size = _read_counter = _curr_file_idx = 0;
+            int read_start_index = 0;
+            if (_shard_size < _batch_count)
+                read_start_index = _batch_count;
+            else {
+                if (_shard_size % _batch_count)
+                    read_start_index = _shard_size;
+                else
+                    read_start_index = _shard_size + (_shard_size % _batch_count);
+            }
+            // To re-arrange the starting index of file-loading keeping in mind the shard_size and batch size
+            std::rotate(_file_names.begin(), _file_names.begin() + read_start_index, _file_names.end());
+        } else {
+            _curr_file_idx = 0;
+            _read_counter = 0;
+        }
+    } else if (_stick_to_shard == false && _shard_count > 1) {
+        // Reset the variables
+        _last_batch_padded_size = _in_batch_read_count = _curr_file_idx = _file_id = _read_counter = 0;
+        _file_names.clear();
+        increment_shard_id();
+        generate_file_names();  // generates the data from next shard in round-robin fashion after completion of an epoch
+        if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
+            // This is to pad within a batch in a shard. Need to change this according to fill / drop or partial.
+            // Adjust last batch only if the last batch padded is true.
+            replicate_last_image_to_fill_last_shard();
+            LOG("FileReader in reset function - Replicated " + _folder_path + _last_file_name + " " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
+        }
+        if (!_file_names.empty())
+            LOG("FileReader in reset function - Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
+    } else {
+        _curr_file_idx = 0;
+        _read_counter = 0;
+    }
+}
+
+void CaffeLMDBRecordReader::increment_shard_id() {
+    _shard_id = (_shard_id + 1) % _shard_count;
 }
 
 Reader::Status CaffeLMDBRecordReader::folder_reading() {
@@ -138,6 +177,21 @@ Reader::Status CaffeLMDBRecordReader::folder_reading() {
     if (Caffe_LMDB_reader() != Reader::Status::OK)
         WRN("CaffeLMDBRecordReader ShardID [" + TOSTR(_shard_id) + "] CaffeLMDBRecordReader cannot access the storage at " + _folder_path);
 
+    uint images_to_pad_shard = _file_count_all_shards - (ceil(_file_count_all_shards / _shard_count) * _shard_count);
+    if (!images_to_pad_shard) {
+        for (uint i = 0; i < images_to_pad_shard; i++) {
+            if (get_file_shard_id() != _shard_id) {
+                _file_count_all_shards++;
+                incremenet_file_id();
+                continue;
+            }
+            _last_file_name = _file_names.at(i);
+            _file_names.push_back(_last_file_name);
+            _file_count_all_shards++;
+            incremenet_file_id();
+        }
+    }
+
     if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
         replicate_last_image_to_fill_last_shard();
         std::cout << "CaffeLMDBRecordReader ShardID [" << TOSTR(_shard_id) << "] Replicated " << _folder_path + _last_file_name << " " << TOSTR((_batch_count - _in_batch_read_count)) << " times to fill the last batch" << std::endl;
@@ -148,10 +202,23 @@ Reader::Status CaffeLMDBRecordReader::folder_reading() {
     return ret;
 }
 void CaffeLMDBRecordReader::replicate_last_image_to_fill_last_shard() {
-    for (size_t i = _in_batch_read_count; i < _batch_count; i++) {
-        _file_names.push_back(_last_file_name);
-        _file_size.insert(pair<std::string, unsigned int>(_last_file_name, _last_file_size));
+    if (_last_batch_info.first == RocalBatchPolicy::FILL || _last_batch_info.first == RocalBatchPolicy::PARTIAL) {
+        if (_last_batch_info.second == true) {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++) {
+                _file_names.push_back(_last_file_name);
+                _file_size.insert(std::pair<std::string, unsigned int>(_last_file_name, _last_file_size));
+            }
+        } else {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++) {
+                _last_file_name = _file_names.at(i);
+                _last_file_size = _file_size[_file_names.at(i)];
+                _file_names.push_back(_file_names.at(i));
+                _file_size.insert(std::pair<std::string, unsigned int>(_last_file_name, _last_file_size));
+            }
+        }
     }
+    if (_last_batch_info.first == RocalBatchPolicy::PARTIAL)
+        _last_batch_padded_size = _batch_count - _in_batch_read_count;
 }
 
 Reader::Status CaffeLMDBRecordReader::Caffe_LMDB_reader() {

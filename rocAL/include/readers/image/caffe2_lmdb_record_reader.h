@@ -68,6 +68,8 @@ class Caffe2LMDBRecordReader : public Reader {
 
     Caffe2LMDBRecordReader();
 
+    size_t last_batch_padded_size() override;
+
    private:
     //! opens the folder containnig the images
     Reader::Status Caffe2_LMDB_reader();
@@ -86,6 +88,7 @@ class Caffe2LMDBRecordReader : public Reader {
     unsigned int _last_file_size;
     size_t _shard_id = 0;
     size_t _shard_count = 1;  // equivalent of batch size
+    signed _shard_size = -1;
     bool _last_rec;
     //!< _batch_count Defines the quantum count of the images to be read. It's usually equal to the user's batch size.
     /// The loader will repeat images if necessary to be able to have images available in multiples of the load_batch_count,
@@ -116,4 +119,10 @@ class Caffe2LMDBRecordReader : public Reader {
     MDB_txn* _read_mdb_txn;
     MDB_cursor* _read_mdb_cursor;
     void open_env_for_read_image();
+    std::pair<RocalBatchPolicy, bool>  _last_batch_info;
+    size_t _last_batch_padded_size = 0;
+    bool _stick_to_shard = false;
+    Reader::Status generate_file_names();
+    //!<// Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
+    void increment_shard_id();
 };

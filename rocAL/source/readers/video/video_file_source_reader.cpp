@@ -57,18 +57,12 @@ VideoReader::Status VideoFileSourceReader::initialize(ReaderConfig desc) {
     _video_frame_count = _video_prop.frames_count;
     _start_end_frame = _video_prop.start_end_frame_num;
     _batch_count = desc.get_batch_size();
+    _last_batch_info = desc.get_last_batch_policy();
+    _stick_to_shard = desc.get_stick_to_shard();
+    _shard_size = desc.get_shard_size();
     _total_sequences_count = 0;
     ret = create_sequence_info();
 
-    // the following code is required to make every shard the same size:: required for multi-gpu training
-    if (_shard_count > 1 && _batch_count > 1) {
-        int _num_batches = _sequences.size() / _batch_count;
-        int max_batches_per_shard = (_sequence_count_all_shards + _shard_count - 1) / _shard_count;
-        max_batches_per_shard = (max_batches_per_shard + _batch_count - 1) / _batch_count;
-        if (_num_batches < max_batches_per_shard) {
-            replicate_last_batch_to_pad_partial_shard();
-        }
-    }
     // shuffle dataset if set
     if (ret == VideoReader::Status::OK && _shuffle)
         std::random_shuffle(_sequences.begin(), _sequences.end());
@@ -79,6 +73,10 @@ VideoReader::Status VideoFileSourceReader::initialize(ReaderConfig desc) {
 void VideoFileSourceReader::incremenet_read_ptr() {
     _read_counter++;
     _curr_sequence_idx = (_curr_sequence_idx + 1) % _sequences.size();
+}
+
+size_t VideoFileSourceReader::last_batch_padded_size() {
+    return _last_batch_padded_size;
 }
 
 SequenceInfo VideoFileSourceReader::get_sequence_info() {
@@ -93,10 +91,51 @@ VideoFileSourceReader::~VideoFileSourceReader() {
 }
 
 void VideoFileSourceReader::reset() {
-    if (_shuffle)
-        std::random_shuffle(_sequences.begin(), _sequences.end());
+    if (_shuffle) std::random_shuffle(_file_names.begin(), _file_names.end());
     _read_counter = 0;
-    _curr_sequence_idx = 0;
+    _curr_file_idx = 0;
+    if (_stick_to_shard == true) {
+        _curr_file_idx = 0;
+        if (_shard_size > 0) {
+            // Reset the variables
+            _last_batch_padded_size = _read_counter = _curr_file_idx = 0;
+            int read_start_index = 0;
+            if (_shard_size < _batch_count)
+                read_start_index = _batch_count;
+            else {
+                if (_shard_size % _batch_count)
+                    read_start_index = _shard_size;
+                else
+                    read_start_index = _shard_size + (_shard_size % _batch_count);
+            }
+            // To re-arrange the starting index of file-loading keeping in mind the shard_size and batch size
+            std::rotate(_file_names.begin(), _file_names.begin() + read_start_index, _file_names.end());
+        } else {
+            _curr_file_idx = 0;
+            _read_counter = 0;
+        }
+    } else if (_stick_to_shard == false && _shard_count > 1) {
+        // Reset the variables
+        _last_batch_padded_size = _in_batch_read_count = _curr_file_idx = _file_id = _read_counter = 0;
+        _file_names.clear();
+        increment_shard_id();
+        generate_file_names();  // generates the data from next shard in round-robin fashion after completion of an epoch
+        if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
+            // This is to pad within a batch in a shard. Need to change this according to fill / drop or partial.
+            // Adjust last batch only if the last batch padded is true.
+            replicate_last_image_to_fill_last_shard();
+            LOG("FileReader in reset function - Replicated " + _folder_path + _last_file_name + " " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
+        }
+        if (!_file_names.empty())
+            LOG("FileReader in reset function - Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
+    } else {
+        _curr_file_idx = 0;
+        _read_counter = 0;
+    }
+}
+
+void VideoFileSourceReader::increment_shard_id() {
+    _shard_id = (_shard_id + 1) % _shard_count;
 }
 
 VideoReader::Status VideoFileSourceReader::create_sequence_info() {
@@ -119,6 +158,21 @@ VideoReader::Status VideoFileSourceReader::create_sequence_info() {
             incremenet_sequence_id();
         }
     }
+    uint sequences_to_pad_shard = _sequence_count_all_shards - (ceil(_sequence_count_all_shards / _shard_count) * _shard_count);
+    if (!sequences_to_pad_shard) {
+        for (uint i = 0; i < sequences_to_pad_shard; i++) {
+            if (get_sequence_shard_id() != _shard_id) {
+                _sequence_count_all_shards++;
+                incremenet_sequence_id();
+                continue;
+            }
+            _last_sequence = _sequences.at(i);
+            _sequences.push_back(_last_sequence);
+            _sequence_count_all_shards++;
+            incremenet_sequence_id();
+        }
+    }
+
     if (_in_batch_read_count > 0 && _in_batch_read_count < _batch_count) {
         replicate_last_sequence_to_fill_last_shard();
         LOG("VideoFileSourceReader ShardID [" + TOSTR(_shard_id) + "] Replicated the last sequence " + TOSTR((_batch_count - _in_batch_read_count)) + " times to fill the last batch")
@@ -129,10 +183,21 @@ VideoReader::Status VideoFileSourceReader::create_sequence_info() {
 }
 
 void VideoFileSourceReader::replicate_last_sequence_to_fill_last_shard() {
-    for (size_t i = _in_batch_read_count; i < _batch_count; i++) {
-        _sequences.push_back(_last_sequence);
-        _total_sequences_count++;
+    if (_last_batch_info.first == RocalBatchPolicy::FILL || _last_batch_info.first == RocalBatchPolicy::PARTIAL) {
+        if (_last_batch_info.second == true) {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++) {
+                _sequences.push_back(_last_sequence);
+                _total_sequences_count++;
+            }
+        } else {
+            for (size_t i = 0; i < (_batch_count - _in_batch_read_count); i++) {
+                _sequences.push_back(_sequences.at(i));
+                _total_sequences_count++;
+            }
+        }
     }
+    if (_last_batch_info.first == RocalBatchPolicy::PARTIAL)
+        _last_batch_padded_size = _batch_count - _in_batch_read_count;
 }
 
 void VideoFileSourceReader::replicate_last_batch_to_pad_partial_shard() {
