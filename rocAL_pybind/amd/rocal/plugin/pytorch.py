@@ -294,6 +294,7 @@ class ROCALAudioIterator(object):
         self.last_batch_padded_size = b.getLastBatchPaddedSize(self.loader._handle)
         self.last_batch_policy = self.loader._last_batch_policy
         self.shard_size =  size
+        print(f'Last Batch Policy {self.last_batch_policy} shard_size: {self.shard_size} batch Size : {self.batch_size}')
         self.auto_reset = auto_reset
         self.batch_count = 0
 

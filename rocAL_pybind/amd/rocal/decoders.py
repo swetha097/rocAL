@@ -404,6 +404,7 @@ def image_slice(*inputs, file_root='', path='', annotations_file='', shard_id=0,
     return (image_decoder_slice)
 
 def audio(*inputs, file_root='', file_list_path='', bytes_per_sample_hint=[0], shard_id=0, num_shards=1, random_shuffle=False, downmix=False, dtype=types.FLOAT, quality=50.0, sample_rate=0.0, seed=1, stick_to_shard=False, shard_size=-1):
+    shard_size = shard_size // num_shards if shard_size!= -1 else shard_size
     kwargs_pybind = {
             "source_path": file_root,
             "source_file_list_path": file_list_path,
@@ -414,8 +415,7 @@ def audio(*inputs, file_root='', file_list_path='', bytes_per_sample_hint=[0], s
             "loop": False,
             "downmix": downmix,
             "stick_to_shard":stick_to_shard,
-            "shard_size":shard_size // num_shards}
-    if (shard_size!= -1):
-        Pipeline._current_pipeline._shard_size = shard_size // num_shards
+            "shard_size":shard_size}
+    Pipeline._current_pipeline._shard_size = shard_size
     decoded_audio = b.audioDecoderSingleShard(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return decoded_audio
