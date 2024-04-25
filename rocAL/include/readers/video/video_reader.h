@@ -61,5 +61,7 @@ class VideoReader {
     virtual unsigned count_items() = 0;
 
     virtual ~VideoReader() = default;
+
+    virtual size_t last_batch_padded_size() = 0;
 };
 #endif

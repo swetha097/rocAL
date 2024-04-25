@@ -107,11 +107,10 @@ class FileSourceReader : public Reader {
     void incremenet_file_id() { _file_id++; }
     void replicate_last_image_to_fill_last_shard();
     void replicate_last_batch_to_pad_partial_shard();
-    std::shared_ptr<MetaDataReader> _meta_data_reader = nullptr;
     std::pair<RocalBatchPolicy, bool>  _last_batch_info;
     size_t _last_batch_padded_size = 0;
     bool _stick_to_shard = false;
     Reader::Status generate_file_names();
-    //!<// Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
-    void increment_shard_id();
+    void increment_shard_id(); //!< Used to advance to the next shard's data to increase the entropy of the data seen by the pipeline>
+    std::shared_ptr<MetaDataReader> _meta_data_reader = nullptr;
 };
