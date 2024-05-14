@@ -31,7 +31,7 @@ class PreemphasisFilterNode : public Node {
    public:
     PreemphasisFilterNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
     PreemphasisFilterNode() = delete;
-    void init(FloatParam *preemph_coeff, RocalAudioBorderType preemph_border);
+    void init(FloatParam *preemph_coeff, RocalAudioBorderType preemph_border, RocalAudioAugmentation augmentation_enum);
 
    protected:
     void create_node() override;
@@ -41,4 +41,5 @@ class PreemphasisFilterNode : public Node {
     ParameterVX<float> _preemph_coeff;
     constexpr static float PREEMPH_COEFF_RANGE[2] = {0.97, 0.97};
     RocalAudioBorderType _preemph_border;
+    RocalAudioAugmentation _augmentation_enum;
 };

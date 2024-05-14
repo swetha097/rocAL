@@ -451,4 +451,28 @@ enum RocalLastBatchPolicy {
     ROCAL_LAST_BATCH_PARTIAL = 2
 };
 
+/*! \brief Tensor Audio Augmentation
+ *  \ingroup group_rocal_types
+ */
+enum RocalAudioAugmentation {
+    /*! \brief AMD ROCAL_RESAMPLE
+     */
+    ROCAL_RESAMPLE = 0,
+    /*! \brief AMD ROCAL_PRE_EMPHASIS_FILTER
+     */
+    ROCAL_PRE_EMPHASIS_FILTER = 1,
+    /*! \brief AMD ROCAL_DOWNMIX
+     */
+    ROCAL_DOWNMIX = 2,
+    /*! \brief AMD ROCAL_TO_DECIBELS
+     */
+    ROCAL_TO_DECIBELS = 3,
+    /*! \brief AMD ROCAL_MEL_FILTER_BANK
+     */
+    ROCAL_MEL_FILTER_BANK = 4,
+    /*! \brief AMD ROCAL_SPECTROGRAM
+     */
+    ROCAL_SPECTROGRAM = 5
+};
+
 #endif  // MIVISIONX_ROCAL_API_TYPES_H

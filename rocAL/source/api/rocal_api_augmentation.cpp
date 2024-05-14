@@ -2180,7 +2180,7 @@ rocalPreEmphasisFilter(RocalContext p_context,
         TensorInfo output_info = input->info();
         output_info.set_data_type(op_tensor_datatype);
         output = context->master_graph->create_tensor(output_info, is_output);
-        context->master_graph->add_node<PreemphasisFilterNode>({input}, {output})->init(preemph_coeff, preemph_border_type);
+        context->master_graph->add_node<PreemphasisFilterNode>({input}, {output})->init(preemph_coeff, preemph_border_type, RocalAudioAugmentation::ROCAL_PRE_EMPHASIS_FILTER);
     } catch (const std::exception& e) {
         context->capture_error(e.what());
         ERR(e.what())
