@@ -33,16 +33,36 @@ void ToDecibelsNode::create_node() {
         return;
 
     vx_status status = VX_SUCCESS;
-    vx_scalar cutoff_db_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_cutoff_db);
-    vx_scalar multiplier_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_multiplier);
-    vx_scalar reference_magnitude_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_reference_magnitude);
+    RocalAudioAugmentation _augmentation_enum = ROCAL_TO_DECIBELS;
+    vx_scalar augmentation_type_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_augmentation_enum);
     int input_layout = static_cast<int>(_inputs[0]->info().layout());
     int output_layout = static_cast<int>(_outputs[0]->info().layout());
     vx_scalar input_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &input_layout);
     vx_scalar output_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
-    _node = vxExtRppToDecibels(_graph->get(), _inputs[0]->handle(), _inputs[0]->get_roi_tensor(), _outputs[0]->handle(), cutoff_db_vx,
-                               multiplier_vx, reference_magnitude_vx, input_layout_vx, output_layout_vx);
 
+    vx_array float_values_vx = vxCreateArray(
+        vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, 3);
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_cutoff_db,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the to_decibels node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_multiplier,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the to_decibels node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_reference_magnitude,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the to_decibels node: " +
+              TOSTR(status))
+    _node = vxExtRppAudioNodes(
+        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
+        _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
+        nullptr, float_values_vx, input_layout_vx, output_layout_vx,
+        nullptr, nullptr, augmentation_type_vx);
+    
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the to_decibels (vxRppToDecibels) node failed: " + TOSTR(status))
 }

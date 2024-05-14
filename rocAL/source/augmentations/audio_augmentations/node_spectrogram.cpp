@@ -35,17 +35,51 @@ void SpectrogramNode::create_node() {
     status |= vxAddArrayItems(window_fn_vx_array, _window_length, _window_fn.data(), sizeof(vx_float32));
     if (status != 0)
         THROW(" vxAddArrayItems failed in the spectrogram node (vxRppSpectrogram)  node: " + TOSTR(status) + "  " + TOSTR(status))
-    vx_scalar center_windows_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_BOOL, &_is_center_windows);
-    vx_scalar reflect_padding_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_BOOL, &_is_reflect_padding);
+    RocalAudioAugmentation _augmentation_enum = ROCAL_SPECTROGRAM;
+    vx_scalar augmentation_type_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_augmentation_enum);
+    int input_layout = static_cast<int>(_inputs[0]->info().layout());
     int output_layout = static_cast<int>(_outputs[0]->info().layout());
-    vx_scalar spectrogram_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
-    vx_scalar power_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_power);
-    vx_scalar nfft_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_nfft);
-    vx_scalar window_length_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_window_length);
-    vx_scalar window_step_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_window_step);
-    _node = vxExtRppSpectrogram(_graph->get(), _inputs[0]->handle(), _inputs[0]->get_roi_tensor(), _outputs[0]->handle(), _outputs[0]->get_roi_tensor(), window_fn_vx_array,
-                                center_windows_vx, reflect_padding_vx, spectrogram_layout_vx, power_vx, nfft_vx, window_length_vx, window_step_vx);
+    vx_scalar input_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &input_layout);
+    vx_scalar output_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
 
+    vx_array int_values_vx = vxCreateArray(
+        vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, 6);
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_is_center_windows,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_is_reflect_padding,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_power,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_nfft,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_window_length,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_window_step,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the spectrogram node: " +
+              TOSTR(status))
+
+    _node = vxExtRppAudioNodes(
+        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
+        _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
+        int_values_vx, nullptr, input_layout_vx, output_layout_vx,
+        window_fn_vx_array, nullptr, augmentation_type_vx);
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the spectrogram node (vxRppSpectrogram) failed: " + TOSTR(status))
 }
