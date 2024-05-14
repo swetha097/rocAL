@@ -31,21 +31,56 @@ MelFilterBankNode::MelFilterBankNode(const std::vector<Tensor *> &inputs, const 
 void MelFilterBankNode::create_node() {
     if (_node)
         return;
-
-    vx_scalar freq_high_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_freq_high);
-    vx_scalar freq_low_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_freq_low);
-    vx_scalar mel_formula_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_mel_formula);
-    vx_scalar nfilter_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_nfilter);
-    vx_scalar normalize_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_BOOL, &_normalize);
-    vx_scalar sample_rate_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, &_sample_rate);
     int input_layout = static_cast<int>(_inputs[0]->info().layout());
     int output_layout = static_cast<int>(_outputs[0]->info().layout());
     vx_scalar input_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &input_layout);
     vx_scalar output_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
-    _node = vxExtRppMelFilterBank(_graph->get(), _inputs[0]->handle(), _inputs[0]->get_roi_tensor(), _outputs[0]->handle(), _outputs[0]->get_roi_tensor(), freq_high_vx,
-                                  freq_low_vx, mel_formula_vx, nfilter_vx, normalize_vx, sample_rate_vx, input_layout_vx, output_layout_vx);
 
     vx_status status;
+    RocalAudioAugmentation _augmentation_enum = ROCAL_MEL_FILTER_BANK;
+    vx_scalar augmentation_type_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_augmentation_enum);
+    vx_array int_values_vx = vxCreateArray(
+        vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, 3);
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_mel_formula,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_nfilter,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)int_values_vx, 1, &_normalize,
+                             sizeof(vx_int32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+
+    vx_array float_values_vx = vxCreateArray(
+        vxGetContext((vx_reference)_graph->get()), VX_TYPE_FLOAT32, 3);
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_freq_high,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_freq_low,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+    status = vxAddArrayItems((vx_array)float_values_vx, 1, &_sample_rate,
+                             sizeof(vx_float32));
+    if (status != 0)
+        THROW(" vxAddArrayItems failed in the mel-filter-bank filter node: " +
+              TOSTR(status))
+
+    _node = vxExtRppAudioNodes(
+        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
+        _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
+        int_values_vx, float_values_vx, input_layout_vx, output_layout_vx,
+        nullptr, nullptr, augmentation_type_vx);
+
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the mel filter bank (vxRppMelFilterBank) node failed: " + TOSTR(status))
 }

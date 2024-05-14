@@ -33,8 +33,18 @@ void DownmixNode::create_node() {
         return;
 
     vx_status status = VX_SUCCESS;
-    _node = vxExtRppDownmix(_graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), _inputs[0]->get_roi_tensor());
+    RocalAudioAugmentation _augmentation_enum = ROCAL_DOWNMIX;
+    int input_layout = static_cast<int>(_inputs[0]->info().layout());
+    int output_layout = static_cast<int>(_outputs[0]->info().layout());
+    vx_scalar input_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &input_layout);
+    vx_scalar output_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
+    vx_scalar augmentation_type_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_augmentation_enum);
 
+    _node = vxExtRppAudioNodes(
+        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
+        _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
+        nullptr, nullptr, input_layout_vx, output_layout_vx,
+        nullptr, nullptr, augmentation_type_vx);
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the downmix (vxExtRppDownmix) node failed: " + TOSTR(status))
 }

@@ -49,7 +49,7 @@ void PreemphasisFilterNode::create_node() {
     vx_scalar input_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &input_layout);
     vx_scalar output_layout_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &output_layout);
     _node = vxExtRppAudioNodes(
-        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(),
+        _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
         _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
         border_type_vx, nullptr, input_layout_vx, output_layout_vx,
         _preemph_coeff.default_array(), nullptr, augmentation_type_vx);
