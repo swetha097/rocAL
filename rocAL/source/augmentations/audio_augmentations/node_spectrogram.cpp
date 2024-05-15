@@ -78,8 +78,8 @@ void SpectrogramNode::create_node() {
     _node = vxExtRppAudioNodes(
         _graph->get(), _inputs[0]->handle(), _outputs[0]->handle(), nullptr,
         _inputs[0]->get_roi_tensor(), _outputs[0]->get_roi_tensor(),
-        int_values_vx, nullptr, input_layout_vx, output_layout_vx,
-        window_fn_vx_array, nullptr, augmentation_type_vx);
+        int_values_vx, window_fn_vx_array, input_layout_vx, output_layout_vx,
+        nullptr, nullptr, augmentation_type_vx);
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the spectrogram node (vxRppSpectrogram) failed: " + TOSTR(status))
 }
