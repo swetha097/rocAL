@@ -52,6 +52,7 @@ def image(*inputs, user_feature_key_map=None, path='', file_root='', annotations
         @return    Decoded and preprocessed image.
     """
     reader = Pipeline._current_pipeline._reader
+    Pipeline._current_pipeline._last_batch_policy = last_batch_policy
     if (device == "gpu"):
         decoder_type = types.DECODER_HW_JEPG
     else:
@@ -178,6 +179,7 @@ def image_raw(*inputs, user_feature_key_map=None, path='', random_shuffle=False,
         @return    Decoded raw image.
     """
     reader = Pipeline._current_pipeline._reader
+    Pipeline._current_pipeline._last_batch_policy = last_batch_policy
 
     if (reader == "TFRecordReaderClassification" or reader == "TFRecordReaderDetection"):
         kwargs_pybind = {
@@ -223,6 +225,7 @@ def image_random_crop(*inputs, user_feature_key_map=None, path='', file_root='',
         @return    Randomly cropped and preprocessed image.
     """
     reader = Pipeline._current_pipeline._reader
+    Pipeline._current_pipeline._last_batch_policy = last_batch_policy
     # Internally calls the C++ Partial decoder's
     if (reader == 'COCOReader'):
         kwargs_pybind = {
@@ -341,6 +344,7 @@ def image_slice(*inputs, file_root='', path='', annotations_file='', shard_id=0,
         @return    Sliced image.
     """
     reader = Pipeline._current_pipeline._reader
+    Pipeline._current_pipeline._last_batch_policy = last_batch_policy
     # Reader -> Randon BBox Crop -> ImageDecoderSlice
     # Random crop parameters taken from pytorch's RandomResizedCrop default function arguments
     # TODO:To pass the crop co-ordinates from random_bbox_crop to image_slice
