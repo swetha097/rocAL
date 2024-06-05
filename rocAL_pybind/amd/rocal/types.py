@@ -89,10 +89,20 @@ from rocal_pybind.types import LANCZOS_INTERPOLATION
 from rocal_pybind.types import GAUSSIAN_INTERPOLATION
 from rocal_pybind.types import TRIANGULAR_INTERPOLATION
 
-# Rocal External Source Mode
+#     Rocal External Source Mode
 from rocal_pybind.types import EXTSOURCE_FNAME
 from rocal_pybind.types import EXTSOURCE_RAW_COMPRESSED
 from rocal_pybind.types import EXTSOURCE_RAW_UNCOMPRESSED
+
+#     RocalAudioBorderType
+from rocal_pybind.types import ZERO
+from rocal_pybind.types import CLAMP
+from rocal_pybind.types import REFLECT
+
+#     RocalLastBatchPolicy
+from rocal_pybind.types import LAST_BATCH_FILL
+from rocal_pybind.types import LAST_BATCH_DROP
+from rocal_pybind.types import LAST_BATCH_PARTIAL
 
 _known_types = {
 
@@ -152,6 +162,14 @@ _known_types = {
     EXTSOURCE_FNAME: ("EXTSOURCE_FNAME", EXTSOURCE_FNAME),
     EXTSOURCE_RAW_COMPRESSED: ("EXTSOURCE_RAW_COMPRESSED", EXTSOURCE_RAW_COMPRESSED),
     EXTSOURCE_RAW_UNCOMPRESSED: ("EXTSOURCE_RAW_UNCOMPRESSED", EXTSOURCE_RAW_UNCOMPRESSED),
+
+    ZERO: ("ZERO", ZERO),
+    CLAMP: ("CLAMP", CLAMP),
+    REFLECT: ("REFLECT", REFLECT),
+
+    LAST_BATCH_FILL : ("LAST_BATCH_FILL", LAST_BATCH_FILL),
+    LAST_BATCH_DROP : ("LAST_BATCH_DROP", LAST_BATCH_DROP),
+    LAST_BATCH_PARTIAL : ("LAST_BATCH_PARTIAL", LAST_BATCH_PARTIAL),
 }
 
 def data_type_function(dtype):
