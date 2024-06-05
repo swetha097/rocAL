@@ -31,9 +31,17 @@ void PreemphasisFilterNode::create_node() {
     if (_node)
         return;
     _preemph_coeff.create_array(_graph, VX_TYPE_FLOAT32, _batch_size);
-    vx_scalar border_type_vx = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_preemph_border);
-    _node = vxExtRppPreemphasisFilter(_graph->get(), _inputs[0]->handle(), _inputs[0]->get_roi_tensor(), _outputs[0]->handle(), _preemph_coeff.default_array(), border_type_vx);
-    vx_status status;
+
+    PreEmphasisFilterArgs vx_args;
+    vx_args.preemphCoeff = _preemph_coeff.default_array();
+    vx_args.borderType = vxCreateScalar(vxGetContext((vx_reference)_graph->get()), VX_TYPE_INT32, &_preemph_border);
+    vx_enum vx_layout_enum = vxRegisterUserStruct(vxGetContext((vx_reference)_graph->get()), sizeof(PreEmphasisFilterArgs));
+    vx_array vx_args_array = vxCreateArray(vxGetContext((vx_reference)_graph->get()), vx_layout_enum, 1 * sizeof(PreEmphasisFilterArgs));
+    vx_status status = vxAddArrayItems(vx_args_array, 1, &vx_args, sizeof(PreEmphasisFilterArgs));
+    if (status != 0)
+        THROW("vxAddArrayItems for args failed in the resize (vxExtRppResize) node: " + TOSTR(status));
+
+    _node = vxExtRppPreemphasisFilter(_graph->get(), _inputs[0]->handle(), _inputs[0]->get_roi_tensor(), _outputs[0]->handle(), vx_args_array);
     if ((status = vxGetStatus((vx_reference)_node)) != VX_SUCCESS)
         THROW("Adding the vxExtRppPreemphasisFilter node failed: " + TOSTR(status))
 }
