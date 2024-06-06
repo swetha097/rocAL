@@ -40,6 +40,7 @@ CIFAR10DataReader::CIFAR10DataReader() {
     _file_id = 0;
     _total_file_size = 0;
     _last_file_idx = 0;
+    _file_count_all_shards = 0;
 }
 
 unsigned CIFAR10DataReader::count_items() {
