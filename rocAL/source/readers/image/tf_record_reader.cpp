@@ -230,6 +230,7 @@ Reader::Status TFRecordReader::folder_reading() {
         _all_shard_file_sizes_padded = _file_size;
     }
         _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
+        _last_file_size = _all_shard_file_sizes_padded[_last_file_name];
 
     return ret;
 }
