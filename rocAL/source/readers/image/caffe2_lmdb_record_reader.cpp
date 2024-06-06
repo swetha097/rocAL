@@ -107,7 +107,6 @@ void Caffe2LMDBRecordReader::incremenet_read_ptr() {
     _read_counter++;
     increment_curr_file_idx();
 }
-
 size_t Caffe2LMDBRecordReader::open() {
     auto file_path = _all_shard_file_names_padded[_curr_file_idx];  // Get next file name
     _last_id = file_path;
@@ -163,9 +162,8 @@ Reader::Status Caffe2LMDBRecordReader::folder_reading() {
 
     if (!_file_names.empty())
         LOG("Caffe2LMDBRecordReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
-    
-    
-    auto dataset_size = _file_count_all_shards;
+
+            auto dataset_size = _file_count_all_shards;
     // Pad the _file_names with last element of the shard in the vector when _pad_last_batch_repeated is True
     if (_shard_size > 0)
         _padded_samples = _shard_size % _batch_count;
@@ -185,21 +183,28 @@ Reader::Status Caffe2LMDBRecordReader::folder_reading() {
             uint shard_size_with_padding = std::ceil(dataset_size * 1.0 / _shard_count);
             auto start = _file_names.begin() + start_idx;
             auto end = _file_names.begin() + start_idx + shard_size_without_padding;
+            auto start_file_size = std::next(_file_size.begin(), start_idx);
+            auto end_file_size = std::next(_file_size.begin(), start_idx + shard_size_without_padding);
             if (start != end && start <= _file_names.end() &&
                 end <= _file_names.end()) {
                 _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), start, end);
+                for (auto it = start_file_size; it != end_file_size; ++it) 
+                    _all_shard_file_sizes_padded.insert(*it);
             }
             if (shard_size_with_padding % _batch_count) {
                 _num_padded_samples = (shard_size_with_padding - shard_size_without_padding) + _batch_count - (shard_size_with_padding % _batch_count);
                 _file_count_all_shards += _num_padded_samples;
                 _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), _num_padded_samples, _all_shard_file_names_padded.back());
+                for (uint i = 0; i < _num_padded_samples; ++i)
+                    _all_shard_file_sizes_padded.insert({_all_shard_file_names_padded.back(), _file_size[_all_shard_file_names_padded.back()]});
             }
         }
     } else {
         _all_shard_file_names_padded = _file_names;
+        _all_shard_file_sizes_padded = _file_size;
     }
-    _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
-
+        _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
+        _last_file_size = _all_shard_file_sizes_padded[_last_file_name];
     closedir(_sub_dir);
     return ret;
 }
@@ -265,13 +270,13 @@ void Caffe2LMDBRecordReader::read_image_names() {
             if (chk_byte_data) {
                 _file_names.push_back(str_key.c_str());
                 _last_file_name = str_key.c_str();
+                _file_count_all_shards++;
                 _last_file_size = image_proto.byte_data().size();
                 _file_size.insert(pair<std::string, unsigned int>(_last_file_name, _last_file_size));
             } else {
                 THROW("\n Image parsing failed");
             }
         }
-        incremenet_file_id();
     }
 
     mdb_cursor_close(cursor);

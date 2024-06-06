@@ -25,6 +25,7 @@ THE SOFTWARE.
 #include <sstream>
 #include <string>
 #include <vector>
+#include <math.h>
 
 TFRecordReader::TFRecordReader() {
     _src_dir = nullptr;
@@ -118,12 +119,12 @@ size_t TFRecordReader::open() {
     if (std::string::npos != last_slash_idx) {
         _last_id.erase(0, last_slash_idx + 1);
     }
-    _current_file_size = _file_size[_all_shard_file_names_padded[_curr_file_idx]];
+    _current_file_size = _all_shard_file_sizes_padded[_all_shard_file_names_padded[_curr_file_idx]];
     return _current_file_size;
 }
 
 size_t TFRecordReader::read_data(unsigned char *buf, size_t read_size) {
-    auto ret = read_image(buf, _all_shard_file_names_padded[_curr_file_idx], _file_size[_all_shard_file_names_padded[_curr_file_idx]]);
+    auto ret = read_image(buf, _all_shard_file_names_padded[_curr_file_idx], _all_shard_file_sizes_padded[_all_shard_file_names_padded[_curr_file_idx]]);
     if (ret != Reader::Status::OK)
         THROW("TFRecordReader: Error in reading TF records");
     incremenet_read_ptr();
@@ -178,7 +179,7 @@ Reader::Status TFRecordReader::folder_reading() {
         if (tf_record_reader() != Reader::Status::OK)
             WRN("FileReader ShardID [" + TOSTR(_shard_id) + "] File reader cannot access the storage at " + _folder_path);
     }
-
+ 
     if (!_file_names.empty())
         LOG("FileReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
     closedir(_sub_dir);
@@ -203,22 +204,32 @@ Reader::Status TFRecordReader::folder_reading() {
             uint shard_size_with_padding = std::ceil(dataset_size * 1.0 / _shard_count);
             auto start = _file_names.begin() + start_idx;
             auto end = _file_names.begin() + start_idx + shard_size_without_padding;
+            // auto start_file_size = _file_size.begin();
+            // std::advance(start_file_size, start_idx);
+            auto start_file_size = std::next(_file_size.begin(), start_idx);
+            auto end_file_size = std::next(_file_size.begin(), start_idx + shard_size_without_padding);
             if (start != end && start <= _file_names.end() &&
                 end <= _file_names.end()) {
                 _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), start, end);
+                // auto file_name = _file_names[start_idx + shard_size_without_padding];
+                // _all_shard_file_sizes_padded.insert(start_file_size, _file_size.find(file_name));
+                for (auto it = start_file_size; it != end_file_size; ++it) 
+                    _all_shard_file_sizes_padded.insert(*it);
             }
             if (shard_size_with_padding % _batch_count) {
                 _num_padded_samples = (shard_size_with_padding - shard_size_without_padding) + _batch_count - (shard_size_with_padding % _batch_count);
                 _file_count_all_shards += _num_padded_samples;
                 _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), _num_padded_samples, _all_shard_file_names_padded.back());
+                // _all_shard_file_sizes_padded.insert(_all_shard_file_sizes_padded.end(), _num_padded_samples, _all_shard_file_sizes_padded.back())
+                for (uint i = 0; i < _num_padded_samples; ++i)
+                    _all_shard_file_sizes_padded.insert({_all_shard_file_names_padded.back(), _file_size[_all_shard_file_names_padded.back()]});
             }
         }
     } else {
         _all_shard_file_names_padded = _file_names;
+        _all_shard_file_sizes_padded = _file_size;
     }
-
-    _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
-
+        _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
 
     return ret;
 }
@@ -291,10 +302,6 @@ Reader::Status TFRecordReader::read_image_names(std::ifstream &file_contents, ui
         }
         _image_record_starting.insert(std::pair<std::string, uint>(fname, length));
         _last_file_name = file_path;
-
-        file_contents.read((char *)&data_crc, sizeof(data_crc));
-        if (!file_contents)
-            THROW("TFRecordReader: Error in reading TF records")
 
         _file_names.push_back(file_path);
         _file_count_all_shards++;

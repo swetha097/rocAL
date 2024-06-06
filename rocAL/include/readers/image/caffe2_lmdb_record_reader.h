@@ -80,7 +80,7 @@ class Caffe2LMDBRecordReader : public Reader {
     DIR* _sub_dir;
     struct dirent* _entity;
     std::vector<std::string> _file_names;
-    std::map<std::string, unsigned int> _file_size;
+    std::map<std::string, unsigned int> _file_size, _all_shard_file_sizes_padded;
     unsigned _curr_file_idx;
     unsigned _current_file_size;
     std::string _last_id;
