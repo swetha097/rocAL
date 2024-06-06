@@ -277,7 +277,8 @@ Reader::Status FileSourceReader::generate_file_names() {
         _padded_samples = _shard_size % _batch_count;
     else
         _padded_samples = shard_size_with_padding() % _batch_count;
-    _last_batch_padded_size = _batch_count - _padded_samples;
+    if (_padded_samples != 0)
+        _last_batch_padded_size = _batch_count - _padded_samples;
 
     if (_pad_last_batch_repeated ==
         true) { // pad the last sample when the dataset_size is not divisible by
