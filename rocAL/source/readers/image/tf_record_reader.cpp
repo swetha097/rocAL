@@ -183,7 +183,7 @@ Reader::Status TFRecordReader::folder_reading() {
         LOG("FileReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
     closedir(_sub_dir);
 
-        auto dataset_size = _file_count_all_shards;
+    auto dataset_size = _file_count_all_shards;
     // Pad the _file_names with last element of the shard in the vector when _pad_last_batch_repeated is True
     if (_shard_size > 0)
         _padded_samples = _shard_size % _batch_count;
@@ -297,6 +297,7 @@ Reader::Status TFRecordReader::read_image_names(std::ifstream &file_contents, ui
             THROW("TFRecordReader: Error in reading TF records")
 
         _file_names.push_back(file_path);
+        _file_count_all_shards++;
         _single_feature = feature.at(_encoded_key);
         _last_file_size = _single_feature.bytes_list().value()[0].size();
         _file_size.insert(std::pair<std::string, unsigned int>(_last_file_name, _last_file_size));

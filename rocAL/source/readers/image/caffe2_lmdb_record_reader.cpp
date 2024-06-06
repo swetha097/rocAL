@@ -83,8 +83,9 @@ Reader::Status Caffe2LMDBRecordReader::initialize(ReaderConfig desc) {
     ret = folder_reading();
     _curr_file_idx = get_start_idx(); // shard's start_idx would vary for every shard in the vector
     // shuffle dataset if set
-    std::random_shuffle(_all_shard_file_names_padded.begin() + get_start_idx(),
-                        _all_shard_file_names_padded.begin() + get_start_idx() + shard_size_without_padding());
+    if (ret == Reader::Status::OK && _shuffle)
+        std::random_shuffle(_all_shard_file_names_padded.begin() + get_start_idx(),
+                            _all_shard_file_names_padded.begin() + get_start_idx() + shard_size_without_padding());
 
     return ret;
 }
