@@ -160,9 +160,8 @@ Reader::Status Caffe2LMDBRecordReader::folder_reading() {
     if (Caffe2_LMDB_reader() != Reader::Status::OK)
         WRN("Caffe2LMDBRecordReader ShardID [" + TOSTR(_shard_id) + "] Caffe2LMDBRecordReader cannot access the storage at " + _folder_path);
 
-    if (!_file_names.empty())
-        LOG("Caffe2LMDBRecordReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
-
+        if (!_file_names.empty())
+        std::cout << "Caffe2LMDBRecordReader ShardID [" << TOSTR(_shard_id) << "] Total of " << TOSTR(_file_names.size()) << " images loaded from " << _full_path << std::endl;
             auto dataset_size = _file_count_all_shards;
     // Pad the _file_names with last element of the shard in the vector when _pad_last_batch_repeated is True
     if (_shard_size > 0)
