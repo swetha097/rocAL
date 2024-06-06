@@ -454,7 +454,7 @@ def audio(*inputs, file_root='', file_list_path='', bytes_per_sample_hint=[0], s
         @param seed                     Random seed.
         @param stick_to_shard           The reader sticks to the data for it's corresponding shard when enabled
         @param shard_size               Number of files in an epoch
-        @param last_batch_policy        Determines the handling of the last batch when the shard size is not divisible by the batch size. Check RocalLastBatchPolicy() enum for possible values.
+        @param last_batch_policy        Determines the handling of the last batch when the shard size is not divisible by the batch size. Check types.py enum for possible values.
         @param pad_last_batch_repeated  If set to True, pads the shards last batch by repeating the last sample's data (dummy data).
         @return                         Decoded audio.
     """

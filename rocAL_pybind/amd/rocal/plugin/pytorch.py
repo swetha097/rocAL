@@ -295,7 +295,6 @@ class ROCALAudioIterator(object):
         @param device_id           The ID of the device to use
     """
     def __init__(self, pipeline, tensor_dtype = types.FLOAT, size = -1, auto_reset = False, device = "cpu", device_id = 0):
-        print("INIT")
         self.loader = pipeline
         self.device = device
         self.device_id = device_id
@@ -309,7 +308,6 @@ class ROCALAudioIterator(object):
         self.last_batch_padded_size = b.getLastBatchPaddedSize(self.loader._handle)
         self.last_batch_policy = self.loader._last_batch_policy
         self.shard_size =  size
-        print(f' shard_size: {self.shard_size}')
         self.auto_reset = auto_reset
         self.batch_count = 0
 
@@ -370,7 +368,6 @@ class ROCALAudioIterator(object):
             return [inner_list[0:self.last_batch_size,:] for inner_list in self.output_list], self.labels_tensor[0:self.last_batch_size], torch.tensor(self.roi_array.reshape(self.batch_size, self.num_of_rois)[...,self.num_of_rois-2:self.num_of_rois][0:self.last_batch_size,:])
         else:
             return self.output_list, self.labels_tensor, torch.tensor(self.roi_array.reshape(self.batch_size, self.num_of_rois)[...,self.num_of_rois-2:self.num_of_rois])
-
 
     def reset(self):
         self.batch_count = 0
