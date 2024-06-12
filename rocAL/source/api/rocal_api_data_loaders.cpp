@@ -38,6 +38,7 @@ THE SOFTWARE.
 #include "loaders/audio/audio_source_evaluator.h"
 #include "loaders/audio/node_audio_loader.h"
 #include "loaders/audio/node_audio_loader_single_shard.h"
+#include "augmentations/audio_augmentations/node_downmix.h"
 #endif
 #include "augmentations/geometry_augmentations/node_resize.h"
 #include "rocal_api.h"
@@ -2219,7 +2220,20 @@ rocalAudioFileSourceSingleShard(
         auto cpu_num_threads = context->master_graph->calculate_cpu_num_threads(shard_count);
         context->master_graph->add_node<AudioLoaderSingleShardNode>({}, {output})->Init(shard_id, shard_count, cpu_num_threads, source_path, "", StorageType::FILE_SYSTEM, DecoderType::AUDIO_SOFTWARE_DECODE, shuffle, loop, context->user_batch_size(), context->master_graph->mem_type(), context->master_graph->meta_data_reader());
         context->master_graph->set_loop(loop);
-        if (is_output) {
+        if (downmix && (max_channels > 1)) {
+            TensorInfo output_info = info;
+            std::vector<size_t> output_dims = {context->user_batch_size(), info.dims()[1], 1};
+            output_info.set_dims(output_dims);
+
+            auto downmixed_output = context->master_graph->create_tensor(output_info, false);
+            std::shared_ptr<DownmixNode> downmix_node = context->master_graph->add_node<DownmixNode>({output}, {downmixed_output});
+
+            if (is_output) {
+                auto actual_output = context->master_graph->create_tensor(output_info, is_output);
+                context->master_graph->add_node<CopyNode>({downmixed_output}, {actual_output});
+            }
+            return downmixed_output;
+        } else if (is_output) {
             auto actual_output = context->master_graph->create_tensor(info, is_output);
             context->master_graph->add_node<CopyNode>({output}, {actual_output});
         }
@@ -2238,7 +2252,7 @@ rocalAudioFileSource(
     RocalContext p_context,
     const char* source_path,
     const char* source_file_list_path,
-    unsigned internal_shard_count,
+    unsigned shard_count,
     bool is_output,
     bool shuffle,
     bool loop,
@@ -2258,13 +2272,24 @@ rocalAudioFileSource(
         output = context->master_graph->create_loader_output_tensor(info);
         output->reset_audio_sample_rate();
 
-        if (internal_shard_count < 1)
+        if (shard_count < 1)
             THROW("internal shard count should be bigger than 0")
 
-        auto cpu_num_threads = context->master_graph->calculate_cpu_num_threads(internal_shard_count);
-        context->master_graph->add_node<AudioLoaderNode>({}, {output})->Init(internal_shard_count, cpu_num_threads, source_path, "", StorageType::FILE_SYSTEM, DecoderType::AUDIO_SOFTWARE_DECODE, shuffle, loop, context->user_batch_size(), context->master_graph->mem_type(), context->master_graph->meta_data_reader());
+        auto cpu_num_threads = context->master_graph->calculate_cpu_num_threads(shard_count);
+        context->master_graph->add_node<AudioLoaderNode>({}, {output})->Init(shard_count, cpu_num_threads, source_path, "", StorageType::FILE_SYSTEM, DecoderType::AUDIO_SOFTWARE_DECODE, shuffle, loop, context->user_batch_size(), context->master_graph->mem_type(), context->master_graph->meta_data_reader());
         context->master_graph->set_loop(loop);
-        if (is_output) {
+        if (downmix && (max_channels > 1)) {
+            TensorInfo output_info = info;
+            std::vector<size_t> output_dims = {context->user_batch_size(), info.dims()[1], 1};
+            output_info.set_dims(output_dims);
+            auto downmixed_output = context->master_graph->create_tensor(output_info, false);
+            std::shared_ptr<DownmixNode> downmix_node = context->master_graph->add_node<DownmixNode>({output}, {downmixed_output});
+            if (is_output) {
+                auto actual_output = context->master_graph->create_tensor(output_info, is_output);
+                context->master_graph->add_node<CopyNode>({downmixed_output}, {actual_output});
+            }
+            return downmixed_output;
+        } else if (is_output) {
             auto actual_output = context->master_graph->create_tensor(info, is_output);
             context->master_graph->add_node<CopyNode>({output}, {actual_output});
         }
