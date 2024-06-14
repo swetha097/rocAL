@@ -21,6 +21,7 @@ THE SOFTWARE.
 */
 
 #include <assert.h>
+#include <unordered_map>
 #ifdef ROCAL_VIDEO
 #include "loaders/video/node_video_loader.h"
 #include "loaders/video/node_video_loader_single_shard.h"
@@ -34,6 +35,8 @@ THE SOFTWARE.
 #include "loaders/image/node_fused_jpeg_crop_single_shard.h"
 #include "loaders/image/node_image_loader.h"
 #include "loaders/image/node_image_loader_single_shard.h"
+#include "loaders/image/node_numpy_loader.h"
+#include "loaders/image/node_numpy_loader_single_shard.h"
 #ifdef ROCAL_AUDIO
 #include "loaders/audio/audio_source_evaluator.h"
 #include "loaders/audio/node_audio_loader.h"
@@ -88,6 +91,21 @@ evaluate_image_data_set(RocalImageSizeEvaluationPolicy decode_size_policy, Stora
 
     LOG("Maximum input image dimension [ " + TOSTR(max_width) + " x " + TOSTR(max_height) + " ] for images in " + source_path)
     return std::make_tuple(max_width, max_height);
+};
+
+std::vector<size_t>
+evaluate_numpy_data_set(StorageType storage_type,
+                        DecoderType decoder_type, const std::string& source_path) {
+    ImageSourceEvaluator source_evaluator;
+    source_evaluator.set_size_evaluation_policy(MaxSizeEvaluationPolicy::MAXIMUM_FOUND_SIZE);
+    auto reader_cfg = ReaderConfig(storage_type, source_path);
+    if (source_evaluator.create(reader_cfg) != ImageSourceEvaluatorStatus::OK)
+        THROW("Initializing file source input evaluator failed ")
+    auto max_dims = source_evaluator.max_numpy_dims();
+    int data_type = (int)source_evaluator.get_numpy_dtype();
+    max_dims.push_back(data_type);
+
+    return max_dims;
 };
 
 auto convert_color_format = [](RocalImageColor color_format, size_t n, size_t h, size_t w) {
@@ -1701,6 +1719,124 @@ rocalVideoFileSource(
 }
 
 RocalTensor ROCAL_API_CALL
+rocalNumpyFileSource(
+    RocalContext p_context,
+    const char* source_path,
+    unsigned shard_count,
+    bool is_output,
+    bool shuffle,
+    bool loop,
+    std::pair<RocalLastBatchPolicy, bool> last_batch_info) {
+    Tensor* output = nullptr;
+    auto context = static_cast<Context*>(p_context);
+    try {
+        auto max_dimensions = evaluate_numpy_data_set(StorageType::NUMPY_DATA, DecoderType::SKIP_DECODE,
+                                                      source_path);
+
+        RocalTensorDataType tensor_data_type;
+        std::unordered_map<int, RocalTensorDataType> data_type_map = {
+            {0, RocalTensorDataType::FP32},
+            {1, RocalTensorDataType::FP16},
+            {2, RocalTensorDataType::UINT8},
+            {3, RocalTensorDataType::INT8},
+            {4, RocalTensorDataType::UINT32},
+            {5, RocalTensorDataType::INT32},
+        };
+        tensor_data_type = data_type_map[max_dimensions.back()];
+        max_dimensions.pop_back();
+        unsigned num_of_dims = max_dimensions.size() + 1;
+        std::vector<size_t> dims;
+        dims.resize(num_of_dims);
+        dims[0] = context->user_batch_size();
+        for (uint i = 0; i < max_dimensions.size(); i++)
+            dims[i + 1] = max_dimensions[i];
+        auto info = TensorInfo(std::vector<size_t>(std::move(dims)),
+                               context->master_graph->mem_type(),
+                               tensor_data_type);
+        info.set_max_shape();
+        output = context->master_graph->create_loader_output_tensor(info);
+
+        auto last_batch_policy = convert_last_batch_policy(last_batch_info.first);
+        std::pair<RocalBatchPolicy, bool> policy_info = std::make_pair(last_batch_policy, last_batch_info.second);
+        context->master_graph->add_node<NumpyLoaderNode>({}, {output})->init(shard_count, source_path, StorageType::NUMPY_DATA, DecoderType::SKIP_DECODE, shuffle, loop, context->user_batch_size(), context->master_graph->mem_type(), policy_info);
+        context->master_graph->set_loop(loop);
+
+        if (is_output) {
+            auto actual_output = context->master_graph->create_tensor(info, is_output);
+            context->master_graph->add_node<CopyNode>({output}, {actual_output});
+        }
+
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        std::cerr << e.what() << '\n';
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalNumpyFileSourceSingleShard(
+    RocalContext p_context,
+    const char* source_path,
+    bool is_output,
+    bool shuffle,
+    bool loop,
+    unsigned shard_id,
+    unsigned shard_count,
+    std::pair<RocalLastBatchPolicy, bool> last_batch_info) {
+    Tensor* output = nullptr;
+    auto context = static_cast<Context*>(p_context);
+    try {
+        if (shard_count < 1)
+            THROW("Shard count should be bigger than 0")
+
+        if (shard_id >= shard_count)
+            THROW("Shard id should be smaller than shard count")
+
+        auto max_dimensions = evaluate_numpy_data_set(StorageType::NUMPY_DATA, DecoderType::SKIP_DECODE,
+                                                      source_path);
+
+        RocalTensorDataType tensor_data_type;
+        std::unordered_map<int, RocalTensorDataType> data_type_map = {
+            {0, RocalTensorDataType::FP32},
+            {1, RocalTensorDataType::FP16},
+            {2, RocalTensorDataType::UINT8},
+            {3, RocalTensorDataType::INT8},
+            {4, RocalTensorDataType::UINT32},
+            {5, RocalTensorDataType::INT32},
+        };
+        auto dtype = max_dimensions.at(max_dimensions.size() - 1);
+        max_dimensions.pop_back();
+        tensor_data_type = data_type_map[dtype];
+        unsigned num_of_dims = max_dimensions.size() + 1;
+        std::vector<size_t> dims;
+        dims.resize(num_of_dims);
+        dims[0] = context->user_batch_size();
+        for (uint i = 0; i < max_dimensions.size(); i++)
+            dims[i + 1] = max_dimensions[i];
+        auto info = TensorInfo(std::vector<size_t>(std::move(dims)),
+                               context->master_graph->mem_type(),
+                               tensor_data_type);
+        info.set_max_shape();
+        output = context->master_graph->create_loader_output_tensor(info);
+
+        auto last_batch_policy = convert_last_batch_policy(last_batch_info.first);
+        std::pair<RocalBatchPolicy, bool> policy_info = std::make_pair(last_batch_policy, last_batch_info.second);
+        context->master_graph->add_node<NumpyLoaderSingleShardNode>({}, {output})->init(shard_id, shard_count, source_path, StorageType::NUMPY_DATA, DecoderType::SKIP_DECODE, shuffle, loop, context->user_batch_size(), context->master_graph->mem_type(), policy_info);
+        context->master_graph->set_loop(loop);
+
+        if (is_output) {
+            auto actual_output = context->master_graph->create_tensor(info, is_output);
+            context->master_graph->add_node<CopyNode>({output}, {actual_output});
+        }
+
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        std::cerr << e.what() << '\n';
+    }
+    return output;
+}
+
+RocalTensor  ROCAL_API_CALL
 rocalVideoFileSourceSingleShard(
     RocalContext p_context,
     const char* source_path,
@@ -2324,4 +2460,27 @@ rocalResetLoaders(RocalContext p_context) {
         return ROCAL_RUNTIME_ERROR;
     }
     return ROCAL_OK;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalSetLayout(
+    RocalContext p_context,
+    RocalTensor p_input,
+    RocalTensorLayout output_layout) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorlayout op_tensor_layout = static_cast<RocalTensorlayout>(output_layout);
+        input->set_layout(op_tensor_layout);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return input;
 }

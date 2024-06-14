@@ -29,6 +29,7 @@ THE SOFTWARE.
 #include <lmdb.h>
 #include "meta_data/meta_data_reader.h"
 #include "readers/video/video_properties.h"
+#include "pipeline/tensor.h"
 
 #define CHECK_LMDB_RETURN_STATUS(status)                                                          \
     do {                                                                                          \
@@ -48,6 +49,7 @@ enum class StorageType {
     MXNET_RECORDIO = 7,
     VIDEO_FILE_SYSTEM = 8,
     EXTERNAL_FILE_SOURCE = 9,      // to support reading from external source
+    NUMPY_DATA = 10
 };
 
 enum class ExternalSourceFileMode {
@@ -146,6 +148,25 @@ struct ImageRecordIOHeader {
                            */
 };
 
+struct NumpyHeaderData {
+   public:
+    std::vector<unsigned> array_shape;
+    RocalTensorDataType type_info;
+    bool fortran_order = false;
+    int64_t data_offset = 0;
+
+    RocalTensorDataType type() const { return type_info; };
+
+    size_t size() const {
+        size_t num_elements = 1;
+        for (const auto &dim : array_shape)
+            num_elements *= dim;
+        return num_elements;
+    };
+
+    size_t nbytes() const { return tensor_data_size(type_info) * size(); }
+    std::vector<unsigned> shape() const { return array_shape; }
+};
 
 class Reader {
    public:
@@ -175,6 +196,10 @@ class Reader {
 
     //! Copies the data of the opened item to the buf
     virtual size_t read_data(unsigned char *buf, size_t read_size) = 0;
+
+    virtual const NumpyHeaderData get_numpy_header_data() { return {}; }
+
+    virtual size_t read_numpy_data(void *buf, size_t read_size, std::vector<size_t> max_shape) { return 0; }
 
     //! Closes the opened item
     virtual int close() = 0;

@@ -350,3 +350,20 @@ def mxnet(path, stick_to_shard=False, pad_last_batch=False):
     mxnet_metadata = b.mxnetReader(
         Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return mxnet_metadata
+
+
+def numpy(*inputs, file_root='', files=[], num_shards=1,
+          random_shuffle=False, shard_id=0, stick_to_shard=False,
+          last_batch_policy=types.LAST_BATCH_FILL, pad_last_batch_repeated=True, seed=0):
+
+    Pipeline._current_pipeline._reader = "NumpyReader"
+    Pipeline._current_pipeline._last_batch_policy = last_batch_policy
+    if pad_last_batch_repeated is False:
+        print("pad_last_batch_repeated = False is not implemented in rocAL. Setting pad_last_batch_repeated to True")
+        pad_last_batch_repeated = True
+    # Output
+    kwargs_pybind = {"source_path": file_root, "is_output": False, "shuffle": random_shuffle,
+                     "loop": False, "shard_id": shard_id, "shard_count": num_shards, "last_batch_info": (last_batch_policy, pad_last_batch_repeated)}
+    numpy_reader_output = b.numpyReaderSourceShard(
+        Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return (numpy_reader_output)

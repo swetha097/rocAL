@@ -616,6 +616,46 @@ extern "C" RocalTensor ROCAL_API_CALL rocalRawTFRecordSourceSingleShard(RocalCon
                                                                         const char* record_name_prefix = "",
                                                                         std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, true});
 
+/*! \brief Creates Numpy raw data reader and loader. It allocates the resources and objects required to read raw data stored on the numpy arrays.
+ * \ingroup group_rocal_data_loaders
+ * \param [in] context Rocal context
+ * \param [in] source_path A NULL terminated char string pointing to the location on the disk
+ * \param [in] internal_shard_count Defines the parallelism level by internally sharding the input dataset and load/decode using multiple decoder/loader instances. Using shard counts bigger than 1 improves the load/decode performance if compute resources (CPU cores) are available.
+ * \param [in] is_output Determines if the user wants the loaded images to be part of the output or not.
+ * \param [in] shuffle Determines if the user wants to shuffle the dataset or not.
+ * \param [in] loop Determines if the user wants to indefinitely loops through images or not.
+ * \param [in] last_batch_info Determines the handling of the last batch when the shard size is not divisible by the batch size. Check RocalLastBatchPolicy() enum for possible values & If set to True, pads the shards last batch by repeating the last sample's data (dummy data).
+ * \return Reference to the output tensor
+ */
+extern "C" RocalTensor ROCAL_API_CALL rocalNumpyFileSource(RocalContext p_context,
+                                                           const char* source_path,
+                                                           unsigned internal_shard_count,
+                                                           bool is_output = false,
+                                                           bool shuffle = false,
+                                                           bool loop = false,
+                                                           std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, true});
+
+/*! \brief Creates Numpy raw data reader and loader. It allocates the resources and objects required to read raw data stored on the numpy arrays.
+ * \ingroup group_rocal_data_loaders
+ * \param [in] context Rocal context
+ * \param [in] source_path A NULL terminated char string pointing to the location on the disk
+ * \param [in] is_output Determines if the user wants the loaded images to be part of the output or not.
+ * \param [in] shuffle Determines if the user wants to shuffle the dataset or not.
+ * \param [in] loop Determines if the user wants to indefinitely loops through images or not.
+ * \param [in] shard_id Shard id for this loader
+ * \param [in] shard_count Total shard count
+ * \param [in] last_batch_info Determines the handling of the last batch when the shard size is not divisible by the batch size. Check RocalLastBatchPolicy() enum for possible values & If set to True, pads the shards last batch by repeating the last sample's data (dummy data).
+ * \return Reference to the output tensor
+ */
+extern "C" RocalTensor rocalNumpyFileSourceSingleShard(RocalContext context,
+                                                       const char* source_path,
+                                                       bool is_output = false,
+                                                       bool shuffle = false,
+                                                       bool loop = false,
+                                                       unsigned shard_id = 0,
+                                                       unsigned shard_count = 1,
+                                                       std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, true});
+
 /*!
  * \brief Creates a video reader and decoder as a source. It allocates the resources and objects required to read and decode mp4 videos stored on the file systems.
  * \ingroup group_rocal_data_loaders
@@ -934,5 +974,8 @@ extern "C" RocalTensor ROCAL_API_CALL rocalAudioFileSourceSingleShard(RocalConte
                                                                       bool stick_to_shard = false,
                                                                       int shard_size = -1,
                                                                       std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, false});
+
+extern "C" RocalTensor ROCAL_API_CALL rocalSetLayout(RocalContext context, RocalTensor input,
+                                                     RocalTensorLayout output_layout = ROCAL_NONE);
 
 #endif  // MIVISIONX_ROCAL_API_DATA_LOADERS_H
