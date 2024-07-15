@@ -23,7 +23,7 @@ THE SOFTWARE.
 #ifndef MIVISIONX_ROCAL_API_META_DATA_H
 #define MIVISIONX_ROCAL_API_META_DATA_H
 #include "rocal_api_types.h"
-
+#include <set>
 /*!
  * \file
  * \brief The AMD rocAL Library - Meta Data
@@ -315,5 +315,10 @@ extern "C" void ROCAL_API_CALL rocalBoxIouMatcher(RocalContext p_context, std::v
  * \return RocalTensorList of matched indices
  */
 extern "C" RocalTensorList ROCAL_API_CALL rocalGetMatchedIndices(RocalContext p_context);
+
+//TODO: Add the comments later
+extern "C" RocalMetaData ROCAL_API_CALL rocalCreateWebDatasetReader(RocalContext p_context, const char* source_path, const char* index_path, std::vector<std::set<std::string>> extensions, bool is_output);
+
+RocalMetaData ROCAL_API_CALL rocalGetAsciiDatas(RocalContext p_context);
 
 #endif  // MIVISIONX_ROCAL_API_META_DATA_H

@@ -289,6 +289,16 @@ RocalTensorList
     return context->master_graph->bbox_meta_data();
 }
 
+RocalMetaData
+    ROCAL_API_CALL
+    rocalGetAsciiDatas(RocalContext p_context) {
+    if (!p_context)
+        THROW("Invalid rocal context passed to rocalGetAsciiDatas")
+    auto context = static_cast<Context*>(p_context);
+    return context->master_graph->ascii_values_meta_data();
+}
+
+
 unsigned
     ROCAL_API_CALL
     rocalGetMaskCount(RocalContext p_context, int* buf) {
@@ -502,6 +512,16 @@ void
     context->master_graph->box_iou_matcher(anchors, high_threshold,
                                            low_threshold,
                                            allow_low_quality_matches);
+}
+
+RocalMetaData
+    ROCAL_API_CALL
+    rocalCreateWebDatasetReader(RocalContext p_context, const char* source_path, const char* index_path, std::vector<std::set<std::string>> extensions, bool is_output) {
+    // TODO: Missing component behaviour is to be handled (Error Handling) - passed as 0
+    if (!p_context)
+        THROW("Invalid rocal context passed to rocalCreateWebDatasetReader")
+    auto context = static_cast<Context*>(p_context);
+    return context->master_graph->create_webdataset_reader(source_path, index_path, extensions , MetaDataReaderType::WEBDATASET_META_DATA_READER, 0);
 }
 
 RocalTensorList
