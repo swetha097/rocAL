@@ -78,8 +78,8 @@ Reader::Status COCOFileSourceReader::initialize(ReaderConfig desc) {
     _batch_count = desc.get_batch_size();
     _last_batch_info = desc.get_last_batch_policy();
     _pad_last_batch_repeated = _last_batch_info.second;
-    _stick_to_shard = desc.get_stick_to_shard();
-    _shard_size = desc.get_shard_size();
+    _stick_to_shard = true;
+    _shard_size = -1;
     _loop = desc.loop();
     _shuffle = desc.shuffle();
     _meta_data_reader = desc.meta_data_reader();
