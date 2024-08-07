@@ -358,8 +358,8 @@ class ROCALAudioIterator(object):
                     output = torch.empty(dimensions, dtype=getattr(
                         torch, torch_dtype), device=torch_gpu_device)
                 else:
-                    output = torch.empty(
-                        dimensions[0], max_x1, max_y1, dtype=getattr(torch, torch_dtype))
+                    output = torch.empty((dimensions[0], max_x1, max_y1), dtype=getattr(
+                        torch, torch_dtype), device=torch_gpu_device)
                 self.labels_tensor = torch.empty(self.labels_size, dtype=getattr(
                     torch, torch_dtype), device=torch_gpu_device)
 

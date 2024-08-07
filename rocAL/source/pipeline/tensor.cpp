@@ -463,7 +463,15 @@ unsigned Tensor::copy_data(void *user_buffer, uint max_rows, uint max_cols) {
         auto temp_src_ptr = static_cast<unsigned char *>(_mem_handle) + i * src_stride;
         auto temp_dst_ptr = static_cast<unsigned char *>(user_buffer) + i * dst_stride;
         for (uint height = 0; height < max_rows; height++) {
-            memcpy(temp_dst_ptr, temp_src_ptr, num_of_bytes_rows);
+            if (_info._mem_type == RocalMemType::HIP) {
+                    // copy from device to device
+                    hipError_t status;
+                    if ((status = hipMemcpyDtoD(temp_dst_ptr, temp_src_ptr, num_of_bytes_rows)))
+                        THROW("copy_data::hipMemcpyDtoD failed: " + TOSTR(status))
+                }
+            else {
+                memcpy(temp_dst_ptr, temp_src_ptr, num_of_bytes_rows);
+            }
             temp_src_ptr += num_of_bytes_max_rows;
             temp_dst_ptr += num_of_bytes_rows;
         }
