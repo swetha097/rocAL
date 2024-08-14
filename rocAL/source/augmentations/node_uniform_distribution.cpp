@@ -33,18 +33,21 @@ UniformDistributionNode::UniformDistributionNode(
 
 void UniformDistributionNode::create_node() {
     if (_node) return;
-
+    create_dist_tensor();
     for (uint i = 0; i < _batch_size; i++) {
         update_param();
-        _uniform_distribution_array[i] = _dist_uniform(_rngs[i]);
+        float* _float_uniform_distribution_array = static_cast<float*>(_uniform_distribution_array);
+        _float_uniform_distribution_array[i] = _dist_uniform(_rngs[i]);
     }
-    _outputs[0]->swap_handle(static_cast<void *>(_uniform_distribution_array.data()));
+    _outputs[0]->swap_handle(static_cast<void *>(_uniform_distribution_array));
 }
 
 void UniformDistributionNode::update_node() {
     for (uint i = 0; i < _batch_size; i++) {
         update_param();
-        _uniform_distribution_array[i] = _dist_uniform(_rngs[i]);
+        // Cast void* to float*
+        float* _float_uniform_distribution_array = static_cast<float*>(_uniform_distribution_array);
+        _float_uniform_distribution_array[i] = _dist_uniform(_rngs[i]);
     }
 }
 
@@ -53,11 +56,37 @@ void UniformDistributionNode::update_param() {
     _dist_uniform = dist_uniform;
 }
 
+// allocate memory for uniform distribution tensor
+void UniformDistributionNode::create_dist_tensor() {
+    vx_size num_of_dims = 2;
+    vx_size stride[num_of_dims];
+    std::vector<size_t> _uniform_distribution_array_dims = {_batch_size, 1};
+    stride[0] = sizeof(float);
+    stride[1] = stride[0] * _uniform_distribution_array_dims[0];
+    // vx_enum mem_type = VX_MEMORY_TYPE_HOST;
+    // if (_inputs[0]->info().mem_type() == RocalMemType::HIP)
+    //     mem_type = VX_MEMORY_TYPE_HIP;
+    allocate_host_or_pinned_mem(&_uniform_distribution_array, stride[1] * 4, _inputs[0]->info().mem_type());
+}
+
 void UniformDistributionNode::init(std::vector<float> &range) {
     _min = range[0];
     _max = range[1];
-    _uniform_distribution_array.resize(_batch_size);
+    // _uniform_distribution_array.resize(_batch_size);
     BatchRNG<std::mt19937> rng = {ParameterFactory::instance()->get_seed_from_seedsequence(), static_cast<int>(_batch_size)};
     _rngs = rng;
     update_param();
 }
+
+UniformDistributionNode::~UniformDistributionNode() {
+    if (_inputs[0]->info().mem_type() == RocalMemType::HIP) {
+#if ENABLE_HIP
+        hipError_t err = hipHostFree(_uniform_distribution_array);
+        if (err != hipSuccess)
+            std::cerr << "\n[ERR] hipFree failed  " << std::to_string(err) << "\n";
+#endif
+    } else {
+        if (_uniform_distribution_array) free(_uniform_distribution_array);
+    }
+}
+

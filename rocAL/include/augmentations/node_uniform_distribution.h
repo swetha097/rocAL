@@ -32,16 +32,19 @@ class UniformDistributionNode : public Node {
     UniformDistributionNode(const std::vector<Tensor *> &inputs,
                             const std::vector<Tensor *> &outputs);
     UniformDistributionNode() = delete;
+    ~UniformDistributionNode();
     void init(std::vector<float> &range);
     void update_param();
 
    protected:
     void create_node() override;
     void update_node() override;
+    void create_dist_tensor();
 
    private:
     float _min, _max;
+    void *_uniform_distribution_array = nullptr;
     std::uniform_real_distribution<float> _dist_uniform;  // uniform distribution
-    std::vector<float> _uniform_distribution_array;
+    // std::vector<float> _uniform_distribution_array;
     BatchRNG<std::mt19937> _rngs = {89, 2};  // Random Seed, Random BatchSize for initialization
 };
