@@ -32,19 +32,32 @@ NormalDistributionNode::NormalDistributionNode(const std::vector<Tensor *> &inpu
 void NormalDistributionNode::create_node() {
     if (_node)
         return;
+    create_dist_tensor();
 
     for (uint i = 0; i < _batch_size; i++) {
         update_param();
-        _normal_distribution_array[i] = _dist_normal(_rngs[i]);
+        float* _float_normal_distribution_array = static_cast<float*>(_normal_distribution_array);
+        _float_normal_distribution_array[i] = _dist_normal(_rngs[i]);
     }
-    _outputs[0]->swap_handle((void *)_normal_distribution_array.data());
+    _outputs[0]->swap_handle((void *)_normal_distribution_array);
 }
 
 void NormalDistributionNode::update_node() {
     for (uint i = 0; i < _batch_size; i++) {
         update_param();
-        _normal_distribution_array[i] = _dist_normal(_rngs[i]);
+        float* _float_normal_distribution_array = static_cast<float*>(_normal_distribution_array);
+        _float_normal_distribution_array[i] = _dist_normal(_rngs[i]);
     }
+}
+
+// allocate memory for uniform distribution tensor
+void NormalDistributionNode::create_dist_tensor() {
+    vx_size num_of_dims = 2;
+    vx_size stride[num_of_dims];
+    std::vector<size_t> _normal_distribution_array_dims = {_batch_size, 1};
+    stride[0] = sizeof(float);
+    stride[1] = stride[0] * _normal_distribution_array_dims[0];
+    allocate_host_or_pinned_mem(&_normal_distribution_array, stride[1] * 4, _inputs[0]->info().mem_type());
 }
 
 void NormalDistributionNode::update_param() {
@@ -55,8 +68,20 @@ void NormalDistributionNode::update_param() {
 void NormalDistributionNode::init(float mean, float std_dev) {
     _mean = mean;
     _std_dev = std_dev;
-    _normal_distribution_array.resize(_batch_size);
+    // _normal_distribution_array.resize(_batch_size);
     BatchRNG<std::mt19937> rng = {ParameterFactory::instance()->get_seed_from_seedsequence(), static_cast<int>(_batch_size)};
     _rngs = rng;
     update_param();
+}
+
+NormalDistributionNode::~NormalDistributionNode() {
+    if (_inputs[0]->info().mem_type() == RocalMemType::HIP) {
+#if ENABLE_HIP
+        hipError_t err = hipHostFree(_normal_distribution_array);
+        if (err != hipSuccess)
+            std::cerr << "\n[ERR] hipFree failed  " << std::to_string(err) << "\n";
+#endif
+    } else {
+        if (_normal_distribution_array) free(_normal_distribution_array);
+    }
 }

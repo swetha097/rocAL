@@ -31,16 +31,19 @@ class NormalDistributionNode : public Node {
    public:
     NormalDistributionNode(const std::vector<Tensor *> &inputs, const std::vector<Tensor *> &outputs);
     NormalDistributionNode() = delete;
+    ~NormalDistributionNode();
     void init(float mean, float stddev);
     void update_param();
 
    protected:
     void create_node() override;
     void update_node() override;
+    void create_dist_tensor();
 
    private:
     float _mean, _std_dev;
+    void *_normal_distribution_array = nullptr;
     std::normal_distribution<float> _dist_normal;
-    std::vector<float> _normal_distribution_array;
+    // std::vector<float> _normal_distribution_array;
     BatchRNG<std::mt19937> _rngs = {89, 2};  // Random Seed & BatchSize for initialization
 };
