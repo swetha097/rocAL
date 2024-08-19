@@ -30,7 +30,6 @@ import ctypes
 import functools
 import inspect
 
-
 class Pipeline(object):
 
     """!Pipeline class internally calls RocalCreate which returns context which will have all

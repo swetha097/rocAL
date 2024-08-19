@@ -347,32 +347,32 @@ def main():
     for case in case_list:
         case_name = test_case_augmentation_map.get(case)
         if case_name == "audio_decoder":
-            audio_pipeline = audio_decoder_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = audio_decoder_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "preemphasis_filter":
-            audio_pipeline = pre_emphasis_filter_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = pre_emphasis_filter_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "spectrogram":
-            audio_pipeline = spectrogram_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = spectrogram_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "downmix":
             audio_pipeline = audio_decoder_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu,
-                                                    path=downmix_audio_path if qa_mode else audio_path, file_list="" if qa_mode else file_list, downmix=True)
+                                                    path=downmix_audio_path if qa_mode else audio_path, file_list="" if qa_mode else file_list, downmix=True, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "to_decibels":
-            audio_pipeline = to_decibels_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = to_decibels_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "slice":
-            audio_pipeline = non_silent_region_and_slice(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = non_silent_region_and_slice(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "non_silent_region":
-            audio_pipeline = non_silent_region(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = non_silent_region(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "resample":
-            audio_pipeline = resample_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = resample_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "tensor_add_tensor":
-            audio_pipeline = tensor_add_tensor_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = tensor_add_tensor_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "tensor_mul_scalar":
-            audio_pipeline = tensor_mul_scalar_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = tensor_mul_scalar_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "mel_filter_bank":
-            audio_pipeline = mel_filter_bank_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = mel_filter_bank_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         if case_name == "normalize":
-            audio_pipeline = normalize_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list)
+            audio_pipeline = normalize_pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, rocal_cpu=rocal_cpu, path=audio_path, file_list=file_list, output_memory_type=types.DEVICE_MEMORY)
         audio_pipeline.build()
-        audio_loader = ROCALAudioIterator(audio_pipeline, auto_reset=True)
+        audio_loader = ROCALAudioIterator(audio_pipeline, auto_reset=True, device='gpu')
         output_tensor_list = audio_pipeline.get_output_tensors()
         dimensions = output_tensor_list[0].dimensions()
         cnt = 0
