@@ -371,17 +371,22 @@ class ROCALAudioIterator(object):
                     output.data_ptr()), self.output_memory_type)
             else:
                 self.output_tensor_list[i].copy_data(
-                    ctypes.c_void_p(output.data_ptr()), max_x1, max_y1)
+                    ctypes.c_void_p(output.data_ptr()), 0, 0, max_y1, max_x1)
             self.output_list.append(output)
 
         self.labels = self.loader.get_image_labels()
         self.labels_tensor = self.labels_tensor.copy_(
             torch.from_numpy(self.labels)).long()
-        # self.roi_data =
-        if (self.last_batch_policy is (types.LAST_BATCH_PARTIAL)) and b.getRemainingImages(self.loader._handle) < self.batch_size:
-            return [inner_list[0:self.last_batch_size, :] for inner_list in self.output_list], self.labels_tensor[0:self.last_batch_size], torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois][0:self.last_batch_size, :]).cuda()
+        if self.device == "cpu":
+            if (self.last_batch_policy is (types.LAST_BATCH_PARTIAL)) and b.getRemainingImages(self.loader._handle) < self.batch_size:
+                return [inner_list[0:self.last_batch_size, :] for inner_list in self.output_list], self.labels_tensor[0:self.last_batch_size], torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois][0:self.last_batch_size, :])
+            else:
+                return self.output_list, self.labels_tensor, torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois])
         else:
-            return self.output_list, self.labels_tensor, torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois]).cuda()
+            if (self.last_batch_policy is (types.LAST_BATCH_PARTIAL)) and b.getRemainingImages(self.loader._handle) < self.batch_size:
+                return [inner_list[0:self.last_batch_size, :] for inner_list in self.output_list], self.labels_tensor[0:self.last_batch_size], torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois][0:self.last_batch_size, :]).cuda()
+            else:
+                return self.output_list, self.labels_tensor, torch.from_numpy(self.roi_array.reshape(self.batch_size, self.num_of_rois)[..., self.num_of_rois-2:self.num_of_rois]).cuda()
 
     def reset(self):
         self.batch_count = 0
