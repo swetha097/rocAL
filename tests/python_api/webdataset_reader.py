@@ -62,18 +62,15 @@ def main():
     webdataset_pipeline = Pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, seed=random_seed, rocal_cpu=_rali_cpu, tensor_dtype = types.UINT8, )
     with webdataset_pipeline:
         img_raw = fn.readers.webdataset(
-        path=wds_data, ext=[{'jpg', 'cls'}],
+        path=wds_data, ext=[{'jpg', 'txt'}], index_paths = index_file, missing_components_behavior = types.SKIP,
         )
-        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format,max_decoded_width=500, max_decoded_height=500)
-
-        tensor_format = types.NHWC
-        tensor_dtype = types.FLOAT
-
-
+        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format,max_decoded_width=500, max_decoded_height=500, index_path = index_file)
         webdataset_pipeline.set_outputs(img)
     webdataset_pipeline.build()
     audioIteratorPipeline = ROCALClassificationIterator(webdataset_pipeline, auto_reset=True)
     cnt = 0
+    import time
+    start = time.time()
     for epoch in range(1):
         print("EPOCH:::::", epoch)
         for i, (output_list, labels) in enumerate(audioIteratorPipeline, 0):
@@ -87,10 +84,11 @@ def main():
                 for img in output_list[j]:
                     draw_patches(img, cnt, "cpu", tensor_dtype, color_format=color_format)
                     cnt += 1
-
-        audioIteratorPipeline.reset()
+    end = time.time()
+    print("\n time taken with idx files:: ", end - start) 
+    audioIteratorPipeline.reset()
                 
-        print("EPOCH DONE")
+    print("EPOCH DONE")
 
 if __name__ == '__main__':
     main()
