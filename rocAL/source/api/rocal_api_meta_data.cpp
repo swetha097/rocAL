@@ -296,7 +296,6 @@ RocalMetaData
     return context->master_graph->ascii_values_meta_data();
 }
 
-
 unsigned
     ROCAL_API_CALL
     rocalGetMaskCount(RocalContext p_context, int* buf) {

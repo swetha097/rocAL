@@ -24,6 +24,7 @@ THE SOFTWARE.
 
 #include "decoders/image/decoder_factory.h"
 #include "readers/image/reader_factory.h"
+
 void WebDataSetSourceEvaluator::set_size_evaluation_policy(WebDataSetMaxSizeEvaluationPolicy arg) {
     _width_max.set_policy(arg);
     _height_max.set_policy(arg);

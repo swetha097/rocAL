@@ -55,7 +55,6 @@ WebDataSetMetaDataReader::WebDataSetMetaDataReader() {
 void WebDataSetMetaDataReader::init(const MetaDataConfig &cfg,
                                     pMetaDataBatch meta_data_batch) {
     _paths = cfg.path();
-    _wds_shards.reserve(_paths.size());
     _index_paths = cfg.index_path();
     _exts = cfg.exts();
     std::string elementToRemove = "jpg";
@@ -112,12 +111,12 @@ void WebDataSetMetaDataReader::print_map_contents() {
 
 void WebDataSetMetaDataReader::release() { _map_content.clear(); }
 
-void WebDataSetMetaDataReader::release(std::string image_name) {
-    if (!exists(image_name)) {
-        WRN("ERROR: Given not present in the map" + image_name);
+void WebDataSetMetaDataReader::release(std::string name) {
+    if (!exists(name)) {
+        WRN("ERROR: Given not present in the map" + name);
         return;
     }
-    _map_content.erase(image_name);
+    _map_content.erase(name);
 }
 
 void WebDataSetMetaDataReader::lookup(
@@ -126,7 +125,7 @@ void WebDataSetMetaDataReader::lookup(
         WRN("No image names passed")
         return;
     }
-    if (image_names.size() != (unsigned)_output->size())
+    if (image_names.size() != static_cast<unsigned>(_output->size()))
         _output->resize(image_names.size());
     for (unsigned i = 0; i < image_names.size(); i++) {
         auto image_name = image_names[i];
@@ -284,7 +283,7 @@ void WebDataSetMetaDataReader::parse_tar_files(
     tar_file = tar_archive.release_file_stream();
 }
 
-void WebDataSetMetaDataReader::read_all(const std::string &_path) {
+void WebDataSetMetaDataReader::read_all(const std::string &path) {
 
     uint ext_idx = 0;
     for (size_t output_index = 0; output_index < _exts.size(); output_index++) {
@@ -297,7 +296,7 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
     std::string _folder_path;
     std::string _full_path;
     std::vector<std::string> entry_name_list;
-    if (_index_paths.size() == 0) {
+    if (!_index_paths.size()) {
         _folder_path = _paths;
         if ((_sub_dir = opendir(_folder_path.c_str())) == nullptr)
             THROW("ERROR: Failed opening the directory at " + _folder_path);
@@ -312,7 +311,7 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
         _wds_shards.reserve(entry_name_list.size());
         // Create n such std-streams for n paths
         for (auto &path : entry_name_list)
-            _wds_shards.emplace_back(FileIOStream::open(_path + path));
+            _wds_shards.emplace_back(FileIOStream::open(path + path));
     } else {
         _folder_path = _index_paths;
         if ((_sub_dir = opendir(_folder_path.c_str())) == nullptr)
@@ -327,11 +326,11 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
             _index_name_list.push_back(entry_name);
         }
         std::sort(_index_name_list.begin(), _index_name_list.end());
-        if ((_sub_dir = opendir(_path.c_str())) == nullptr)
+        if ((_sub_dir = opendir(path.c_str())) == nullptr)
             THROW("WebDatasetSourceReader :: ERROR: Failed opening the "
                   "directory at " +
-                  _path);
-        _full_path = _path;
+                  path);
+        _full_path = path;
         while ((_entity = readdir(_sub_dir)) != nullptr) {
             std::string entry_name(_entity->d_name);
             if (strcmp(_entity->d_name, ".") == 0 || strcmp(_entity->d_name, "..") == 0)
@@ -341,23 +340,24 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
         std::sort(entry_name_list.begin(), entry_name_list.end());
         _wds_shards.reserve(entry_name_list.size());
         for (auto &path : entry_name_list)
-            _wds_shards.emplace_back(FileIOStream::open(_path + path));
+            _wds_shards.emplace_back(FileIOStream::open(path + path));
     }
     closedir(_sub_dir);
 
     std::vector<SampleDescription> unfiltered_samples;
     std::vector<ComponentDescription> unfiltered_components;
 
-    for (unsigned wds_shard_index = 0; wds_shard_index < entry_name_list.size();
+    for (unsigned wds_shard_index = 0; wds_shard_index < _wds_shards.size();
          ++wds_shard_index) {
         unfiltered_samples.resize(0);
         unfiltered_components.resize(0);
-        if (_index_paths.size() == 0)
+        if (!_index_paths.size()) {
             parse_tar_files(unfiltered_samples, unfiltered_components,
                             _wds_shards[wds_shard_index]);
-        else
+        } else {
             parse_index_files(unfiltered_samples, unfiltered_components,
                               _folder_path + _index_name_list[wds_shard_index]);
+        }
 
         // After parsing add the contents to the map
         for (auto &sample : unfiltered_samples) {
@@ -397,7 +397,7 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
                     last_file_name = component.filename;
                 }
                 for (auto& ascii_component: ascii_values) {
-                    if(ascii_component.size() == 0) {   // TODO - Check if it should be less that extension size
+                    if(!ascii_component.size()) {   // TODO - Check if it should be less that extension size
                         if (_missing_component_behaviour == MissingComponentsBehaviour::SKIP) { // skipping sample
                             WRN("WARNING: Skipping the sample with missing components.");
                             skip_sample = true;
@@ -407,7 +407,7 @@ void WebDataSetMetaDataReader::read_all(const std::string &_path) {
                     }
                     // ascii_values.clear();    // Commented to fix seg fault
                 }
-                if (skip_sample == false)
+                if (!skip_sample)
                     add(last_file_name, ascii_values);
             }
         }

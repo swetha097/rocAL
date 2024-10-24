@@ -469,6 +469,7 @@ def webdataset(*inputs, file_root='', index_path='', shard_id=0, num_shards=1, r
           decode_size_policy=types.USER_GIVEN_SIZE_ORIG, max_decoded_width=1000, max_decoded_height=1000, last_batch_policy=types.LAST_BATCH_FILL, last_batch_padded=True):
     """!TODO: Later
     """
+    print("num_shards", num_shards)
     kwargs_pybind = {
         "source_path": file_root,
         "index_path": index_path,

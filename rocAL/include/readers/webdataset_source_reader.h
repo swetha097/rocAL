@@ -76,10 +76,7 @@ class WebDatasetSourceReader : public Reader {
     Reader::Status folder_reading();
     std::string _folder_path;
     std::string _path;
-    std::string _paths, _index_paths;
-    std::map<std::string, std::string> _feature_key_map;
-    std::string _encoded_key;
-    std::string _filename_key;
+    std::string _index_paths;
     DIR *_src_dir;
     DIR *_sub_dir;
     struct dirent *_entity;
@@ -89,13 +86,10 @@ class WebDatasetSourceReader : public Reader {
     unsigned _curr_file_idx;
     unsigned _current_file_size;
     std::string _last_id;
-    std::string _last_file_name;
-    unsigned int _last_file_size;
     std::vector<std::string> _index_name_list;
     size_t _shard_id = 0;
     size_t _shard_count = 1; // equivalent of batch size
     int _file_name_count = 0;
-    bool _last_rec;
     //!< _batch_count Defines the quantum count of the images to be read. It's
     //!< usually equal to the user's batch size.
     /// The loader will repeat images if necessary to be able to have images

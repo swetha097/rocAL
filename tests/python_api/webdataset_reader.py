@@ -24,7 +24,7 @@ def draw_patches(img, idx, device, dtype, color_format=types.RGB):
         img = img.cpu().numpy()
     if dtype == types.FLOAT16:
         img = (img).astype('uint8')
-    print("img shape", img.shape)
+    # print("img shape", img.shape)
 
     if color_format == types.RGB:
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
@@ -62,9 +62,8 @@ def main():
     webdataset_pipeline = Pipeline(batch_size=batch_size, num_threads=num_threads, device_id=device_id, seed=random_seed, rocal_cpu=_rali_cpu, tensor_dtype = types.UINT8, )
     with webdataset_pipeline:
         img_raw = fn.readers.webdataset(
-        path=wds_data, ext=[{'jpg', 'cls'}],
-        )
-        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format,max_decoded_width=500, max_decoded_height=500)
+        path=wds_data, ext=[{'jpg', 'json', 'txt'}], missing_components_behavior = types.SKIP)
+        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format,max_decoded_width=500, max_decoded_height=500, shard_id=1, num_shards=8)
 
         tensor_format = types.NHWC
         tensor_dtype = types.FLOAT
@@ -80,13 +79,13 @@ def main():
             for j in range(len(output_list)):
                 print("**************", i, "*******************")
                 print("**************starts*******************")
-                print("\nImages:\n", output_list[j])
-                print("\nLABELS:\n", labels)
+                # print("\nImages:\n", output_list[j])
+                # print("\nLABELS:\n", labels)
                 print("**************ends*******************")
                 print("**************", i, "*******************")
-                for img in output_list[j]:
-                    draw_patches(img, cnt, "cpu", tensor_dtype, color_format=color_format)
-                    cnt += 1
+                # for img in output_list[j]:
+                #     draw_patches(img, cnt, "cpu", tensor_dtype, color_format=color_format)
+                #     cnt += 1
 
         audioIteratorPipeline.reset()
                 

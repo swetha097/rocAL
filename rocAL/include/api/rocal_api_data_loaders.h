@@ -918,7 +918,24 @@ extern "C" RocalTensor ROCAL_API_CALL rocalAudioFileSourceSingleShard(RocalConte
                                                                       bool shuffle = false,
                                                                       bool loop = false,
                                                                       bool downmix = false);
-// TODO: Add comments later & code clean up later
+/*! Creates WebDataset tar files reader and decoder. It allocates the resources and objects required to read and decode files in webdataset format stored on the file systems. It has internal sharding capability to load/decode in parallel is user wants.
+ * If the files are not in standard audio compression formats they will be ignored.
+ * \param [in] context Rocal context
+ * \param [in] source_path A NULL terminated char string pointing to the location of files on the disk
+ * \param [in] index_path A NULL terminated char string pointing to the location of index files on the disk
+ * \param [in] rocal_color_format The color format the images will be decoded to.
+ * \param [in] shard_id Shard id for this loader.
+ * \param [in] shard_count Defines the parallelism level by internally sharding the input dataset and load/decode using multiple decoder/loader instances. Using shard counts bigger than 1 improves the load/decode performance if compute resources (CPU cores) are available.
+ * \param [in] is_output Boolean variable to enable the audio to be part of the output.
+ * \param [in] shuffle Boolean variable to shuffle the dataset.
+ * \param [in] loop Boolean variable to indefinitely loop through audio.
+ * \param [in] decode_size_policy is the RocalImageSizeEvaluationPolicy for decoding
+ * \param [in] max_width The maximum width of the decoded images, larger or smaller will be resized to closest
+ * \param [in] max_height The maximum height of the decoded images, larger or smaller will be resized to closest
+ * \param [in] rocal_decoder_type Determines the decoder_type - image / video / audio
+ * \param [in] last_batch_info Determines the handling of the last batch when the shard size is not divisible by the batch size. Check RocalLastBatchPolicy() enum for possible values & If set to True, pads the shards last batch by repeating the last sample's data (dummy data).
+ * \return Reference to the output tensor
+ */
 extern "C" RocalTensor ROCAL_API_CALL rocALWebDatasetDecoderSingleShard(RocalContext p_context,
                                                                         const char* source_path,
                                                                         const char* index_path,
