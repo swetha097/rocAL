@@ -17,7 +17,6 @@ import cv2
 
 def draw_patches(img, idx, device, dtype, color_format=types.RGB):
     # image is expected as a tensor, bboxes as numpy
-    import cv2
     if device == "cpu":
         img = img.detach().numpy()
     else:

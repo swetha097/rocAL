@@ -39,12 +39,11 @@ constexpr uint64_t operator ""_u64(unsigned long long x) {
     return x;
 }
 
-constexpr uint64_t kEmptyEofBlocks = 2;
-constexpr uint64_t kTarArchiveBufferInitSize = 1;
+constexpr uint64_t TARARCHIVEBUFFERINITSIZE = 1;
 
 std::mutex instances_mutex;
 std::list<std::vector<TarArchive*>> instances_registry = {
-    std::vector<TarArchive*>(kTarArchiveBufferInitSize)
+    std::vector<TarArchive*>(TARARCHIVEBUFFERINITSIZE)
   };
 TarArchive** instances = instances_registry.back().data();
 

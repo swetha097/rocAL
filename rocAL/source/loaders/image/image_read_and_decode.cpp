@@ -125,9 +125,7 @@ void ImageReadAndDecode::feed_external_input(const std::vector<std::string>& inp
 
 void ImageReadAndDecode::reset() {
     // TODO: Reload images from the folder if needed
-    std::cerr << "\n RESET CALLED";
     _reader->reset();
-    std::cerr << "\n RESET comp";
 }
 
 size_t
