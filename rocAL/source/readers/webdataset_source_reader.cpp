@@ -340,9 +340,9 @@ Reader::Status WebDatasetSourceReader::folder_reading() {
         for (auto& path : entry_name_list)
             _wds_shards.emplace_back(FileIOStream::open(_path + path));
     } else {
-        _folder_path = _index_paths;
-        if ((_sub_dir = opendir(_folder_path.c_str())) == nullptr)
-            THROW("WebDatasetSourceReader ShardID [" + TOSTR(_shard_id) + "] ERROR: Failed opening the directory at " + _folder_path);
+            _folder_path = _index_paths;
+            if ((_sub_dir = opendir(_folder_path.c_str())) == nullptr)
+                THROW("WebDatasetSourceReader ShardID [" + TOSTR(_shard_id) + "] ERROR: Failed opening the directory at " + _folder_path);
             _full_path = _folder_path;
             while ((_entity = readdir(_sub_dir)) != nullptr) {
                 std::string entry_name(_entity->d_name);
@@ -368,16 +368,8 @@ Reader::Status WebDatasetSourceReader::folder_reading() {
                 _wds_shards.emplace_back(FileIOStream::open(_path + path));
     }
 
-    std::vector<SampleDescription> unfiltered_samples;
-    std::vector<ComponentDescription> unfiltered_components;
-
-    for (unsigned wds_shard_index = 0; wds_shard_index < entry_name_list.size(); ++wds_shard_index) {
-        // unfiltered_samples.resize(0); Testing needed after commenting this out.
-        // unfiltered_components.resize(0); Testing needed after commenting this out.
-        if (!_index_paths.size())
-            parse_tar_files(unfiltered_samples, unfiltered_components, _wds_shards[wds_shard_index]);
-        else
-            parse_index_files(unfiltered_samples, unfiltered_components, _folder_path + _index_name_list[wds_shard_index]);
+        std::vector<SampleDescription> unfiltered_samples;
+        std::vector<ComponentDescription> unfiltered_components;
 
         for (unsigned wds_shard_index = 0; wds_shard_index < entry_name_list.size(); ++wds_shard_index) {
             unfiltered_samples.resize(0);
@@ -406,11 +398,11 @@ Reader::Status WebDatasetSourceReader::folder_reading() {
         _padded_samples = largest_shard_size_without_padding() % _batch_count;
     if (_padded_samples != 0)
         _last_batch_padded_size = _batch_count - _padded_samples;
-    if (_pad_last_batch_repeated == true) { 
-        // pad the last sample when the dataset_size is not divisible by
-        // the number of shard's (or) when the shard's size is not
-        // divisible by the batch size making each shard having equal
-        // number of samples
+
+    if (_pad_last_batch_repeated == true) { // pad the last sample when the dataset_size is not divisible by
+                                            // the number of shard's (or) when the shard's size is not
+                                            // divisible by the batch size making each shard having equal
+                                            // number of samples
         for (uint shard_id = 0; shard_id < _shard_count; shard_id++) {
             uint start_idx = (dataset_size * shard_id) / _shard_count;
             uint shard_size_without_padding = std::floor((shard_id + 1) * dataset_size / _shard_count) - floor(shard_id * dataset_size / _shard_count);
