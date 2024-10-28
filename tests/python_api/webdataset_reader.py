@@ -62,7 +62,7 @@ def main():
     with webdataset_pipeline:
         img_raw = fn.readers.webdataset(
         path=wds_data, ext=[{'jpg', 'json', 'txt'}], missing_components_behavior = types.SKIP)
-        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format, max_decoded_width=500, max_decoded_height=500, shard_id=1, num_shards=8)
+        img = fn.decoders.image(img_raw, file_root=wds_data, max_decoded_width=500, max_decoded_height=500, shard_id=1, num_shards=8)
         tensor_format = types.NHWC
         tensor_dtype = types.FLOAT
         webdataset_pipeline.set_outputs(img)
