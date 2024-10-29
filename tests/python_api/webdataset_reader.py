@@ -68,6 +68,7 @@ def main():
         webdataset_pipeline.set_outputs(img)
     webdataset_pipeline.build()
     audioIteratorPipeline = ROCALClassificationIterator(webdataset_pipeline, auto_reset=True)
+    tensor_dtype = types.FLOAT
     cnt = 0
     import time
     start = time.time()
