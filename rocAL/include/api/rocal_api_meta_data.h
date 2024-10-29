@@ -315,7 +315,16 @@ extern "C" void ROCAL_API_CALL rocalBoxIouMatcher(RocalContext p_context, std::v
  */
 extern "C" RocalTensorList ROCAL_API_CALL rocalGetMatchedIndices(RocalContext p_context);
 
-//TODO: Add the comments later
+/*! \brief create web dataset meta-data reader
+ * \ingroup group_rocal_meta_data
+ * \param [in] rocal_context rocal context
+ * \param [in] source_path path to the root files
+ * \param [in] index_path path to the index files
+ * \param [in] extensions The extensions which are acceptable for the webDataset reader for which the output is produced.
+ * \param [in] missing_components_behavior When a certain component is not present , this arguments tells how would the output tensors be created. Options : Skip, Error, Empty
+ * \param [in] is_output To set the meta-data outputs as True/ False.
+ * \return RocalMetaData object, can be used to inquire about the rocal's output (processed) tensors
+ */
 extern "C" RocalMetaData ROCAL_API_CALL rocalCreateWebDatasetReader(RocalContext p_context, const char* source_path, const char* index_path, std::vector<std::set<std::string>> extensions, RocalMissingComponentsBehaviour missing_components_behavior, bool is_output);
 
 RocalMetaData ROCAL_API_CALL rocalGetAsciiDatas(RocalContext p_context);

@@ -5,15 +5,12 @@ from __future__ import print_function
 import random
 import numpy as np
 from amd.rocal.plugin.pytorch import ROCALClassificationIterator
-import torch
 np.set_printoptions(threshold=1000, edgeitems=10000)
 from amd.rocal.pipeline import Pipeline
 import amd.rocal.fn as fn
 import amd.rocal.types as types
 import sys
-import matplotlib.pyplot as plt
 import os
-import cv2
 
 def draw_patches(img, idx, device, dtype, color_format=types.RGB):
     # image is expected as a tensor, bboxes as numpy
@@ -64,7 +61,7 @@ def main():
         img_raw = fn.readers.webdataset(
         path=wds_data, ext=[{'jpg', 'txt'}], index_paths = index_file, missing_components_behavior = types.SKIP,
         )
-        img = fn.decoders.webdataset(img_raw, file_root=wds_data, color_format=color_format,max_decoded_width=500, max_decoded_height=500, index_path = index_file)
+        img = fn.decoders.image(img_raw, file_root=wds_data, max_decoded_width=500, max_decoded_height=500, index_path = index_file)
         webdataset_pipeline.set_outputs(img)
     webdataset_pipeline.build()
     audioIteratorPipeline = ROCALClassificationIterator(webdataset_pipeline, auto_reset=True)
@@ -75,6 +72,7 @@ def main():
     for epoch in range(1):
         print("EPOCH:::::", epoch)
         for i, (output_list, labels) in enumerate(audioIteratorPipeline, 0):
+            print(labels)
             for j in range(len(output_list)):
                 print("**************", i, "*******************")
                 print("**************starts*******************")
