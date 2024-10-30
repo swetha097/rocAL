@@ -51,12 +51,14 @@ void
 
 RocalMetaData
     ROCAL_API_CALL
-    rocalCreateLabelReader(RocalContext p_context, const char* source_path) {
+    rocalCreateLabelReader(RocalContext p_context, const char* source_path, const char* file_list_path) {
     if (!p_context)
         THROW("Invalid rocal context passed to rocalCreateLabelReader")
     auto context = static_cast<Context*>(p_context);
-
-    return context->master_graph->create_label_reader(source_path, MetaDataReaderType::FOLDER_BASED_LABEL_READER);
+    if (strlen(file_list_path) == 0)
+        return context->master_graph->create_label_reader(source_path, MetaDataReaderType::FOLDER_BASED_LABEL_READER);
+    else
+        return context->master_graph->create_label_reader(file_list_path, MetaDataReaderType::TEXT_FILE_META_DATA_READER);
 }
 
 RocalMetaData
@@ -287,15 +289,6 @@ RocalTensorList
     return context->master_graph->bbox_meta_data();
 }
 
-RocalMetaData
-    ROCAL_API_CALL
-    rocalGetAsciiDatas(RocalContext p_context) {
-    if (!p_context)
-        THROW("Invalid rocal context passed to rocalGetAsciiDatas")
-    auto context = static_cast<Context*>(p_context);
-    return context->master_graph->ascii_values_meta_data();
-}
-
 unsigned
     ROCAL_API_CALL
     rocalGetMaskCount(RocalContext p_context, int* buf) {
@@ -511,6 +504,24 @@ void
                                            allow_low_quality_matches);
 }
 
+RocalTensorList
+    ROCAL_API_CALL
+    rocalGetMatchedIndices(RocalContext p_context) {
+    if (!p_context)
+        THROW("Invalid rocal context passed to rocalGetMatchedIndices")
+    auto context = static_cast<Context*>(p_context);
+    return context->master_graph->matched_index_meta_data();
+}
+
+RocalMetaData
+    ROCAL_API_CALL
+    rocalGetAsciiDatas(RocalContext p_context) {
+    if (!p_context)
+        THROW("Invalid rocal context passed to rocalGetAsciiDatas")
+    auto context = static_cast<Context*>(p_context);
+    return context->master_graph->ascii_values_meta_data();
+}
+
 RocalMetaData
     ROCAL_API_CALL
     rocalCreateWebDatasetReader(RocalContext p_context, const char* source_path, const char* index_path, std::vector<std::set<std::string>> extensions, RocalMissingComponentsBehaviour missing_components_behavior, bool is_output) {
@@ -519,13 +530,4 @@ RocalMetaData
         THROW("Invalid rocal context passed to rocalCreateWebDatasetReader")
     auto context = static_cast<Context*>(p_context);
     return context->master_graph->create_webdataset_reader(source_path, index_path, extensions , MetaDataReaderType::WEBDATASET_META_DATA_READER, static_cast<MissingComponentsBehaviour>(missing_components_behavior));
-}
-
-RocalTensorList
-    ROCAL_API_CALL
-    rocalGetMatchedIndices(RocalContext p_context) {
-    if (!p_context)
-        THROW("Invalid rocal context passed to rocalGetMatchedIndices")
-    auto context = static_cast<Context*>(p_context);
-    return context->master_graph->matched_index_meta_data();
 }

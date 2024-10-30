@@ -70,9 +70,6 @@ class WebDatasetSourceReader : public Reader {
 
     WebDatasetSourceReader();
 
-    //! Returns the number of images in the last batch
-    size_t last_batch_padded_size() override;
-
   private:
     //! opens the folder containnig the images
     Reader::Status webdataset_record_reader();
