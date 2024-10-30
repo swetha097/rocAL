@@ -28,7 +28,7 @@ import rocal_pybind as b
 from amd.rocal.pipeline import Pipeline
 
 
-def image(*inputs, user_feature_key_map=None, path='', file_root='', index_path='', annotations_file='', shard_id=0, num_shards=1, random_shuffle=False,
+def image(*inputs, user_feature_key_map=None, path='', file_root='', annotations_file='', shard_id=0, num_shards=1, random_shuffle=False,
           output_type=types.RGB, decoder_type=types.DECODER_TJPEG, device=None,
           decode_size_policy=types.USER_GIVEN_SIZE_ORIG, max_decoded_width=1000, max_decoded_height=1000,
           last_batch_policy=types.LAST_BATCH_FILL, last_batch_padded=True):
@@ -146,22 +146,7 @@ def image(*inputs, user_feature_key_map=None, path='', file_root='', index_path=
             "last_batch_info": (last_batch_policy, last_batch_padded)}
         decoded_image = b.mxnetDecoder(
             Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
-    elif reader == "WebDataset":
-        kwargs_pybind = {
-            "source_path": file_root,
-            "index_path": index_path,
-            "color_format": output_type,
-            "shard_id": shard_id,
-            "num_shards": num_shards,
-            'is_output': False,
-            "shuffle": random_shuffle,
-            "loop": False,
-            "decode_size_policy": decode_size_policy,
-            "max_width": max_decoded_width,
-            "max_height": max_decoded_height,
-            "dec_type": decoder_type,
-            "last_batch_info": (last_batch_policy, last_batch_padded)}
-        decoded_image = b.webDatasetSourceSingleShard(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+
     else:
         kwargs_pybind = {
             "source_path": file_root,
@@ -477,3 +462,42 @@ def audio(*inputs, file_root='', file_list_path='', shard_id=0, num_shards=1, ra
             "downmix": downmix}
     decoded_audio = b.audioDecoderSingleShard(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return decoded_audio
+
+def webdataset(*inputs, file_root='', index_path='', shard_id=0, num_shards=1, random_shuffle=False, stick_to_shard=False, shard_size=-1,
+          color_format=types.RGB, decoder_type=types.DECODER_TJPEG,
+          decode_size_policy=types.USER_GIVEN_SIZE_ORIG, max_decoded_width=1000, max_decoded_height=1000, last_batch_policy=types.LAST_BATCH_FILL, last_batch_padded=True):
+    """!Decodes the webdataset tar files.
+
+        @param inputs                           List of input audio.
+        @param file_root                        Folder Path to the audio data.
+        @param index_path                       Path to the index file corrsponding to the tar files, if not given, will be infered from tar files.
+        @param shard_id                         Shard ID for parallel processing.
+        @param num_shards                       Total number of shards for parallel processing.
+        @param random_shuffle                   Whether to shuffle audio samples randomly.
+        @param stick_to_shard                   The reader sticks to the data for it's corresponding shard when enabled
+        @param shard_size                       Provides the number of files in an epoch of a particular shard.
+        @param color_format                     Color format of the output image.
+        @param decoder_type                     Type of image decoder to use.
+        @param decode_size_policy               Size policy for decoding images.
+        @param max_decoded_width                Maximum width for decoded images.
+        @param max_decoded_height               Maximum height for decoded images.
+        @param last_batch_policy                The last batch policy can be set by the user - FILL, PARTIAL or DROP.
+        @param last_batch_padded                The last batch should be padded or not when dataset size is not exactly divisible by batch size.
+        @return                                 Decoded files.
+    """
+    kwargs_pybind = {
+        "source_path": file_root,
+        "index_path": index_path,
+        "color_format": color_format,
+        "shard_id": shard_id,
+        "num_shards": num_shards,
+        'is_output': False,
+        "shuffle": random_shuffle,
+        "loop": False,
+        "decode_size_policy": decode_size_policy,
+        "max_width": max_decoded_width,
+        "max_height": max_decoded_height,
+        "dec_type": decoder_type,
+        "last_batch_info": (last_batch_policy, last_batch_padded)} # TODO:Add support for LBP for web-dataset reader
+    decoded_output = b.webdatasetDecoderSingleShard(Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return decoded_output

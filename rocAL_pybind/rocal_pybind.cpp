@@ -676,7 +676,7 @@ PYBIND11_MODULE(rocal_pybind, m) {
           py::return_value_policy::reference);
     m.def("externalSourceFeedInput", &wrapperRocalExternalSourceFeedInput,
           py::return_value_policy::reference);
-    m.def("webDatasetSourceSingleShard", &rocALWebDatasetSourceSingleShard, "Reads file from the source given and decodes it",
+    m.def("webdatasetDecoderSingleShard", &rocALWebDatasetDecoderSingleShard, "Reads file from the source given and decodes it",
             py::return_value_policy::reference);
     m.def("audioDecoder", &rocalAudioFileSource, "Reads file from the source given and decodes it",
             py::return_value_policy::reference);

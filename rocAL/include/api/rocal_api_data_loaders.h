@@ -935,7 +935,7 @@ extern "C" RocalTensor ROCAL_API_CALL rocalAudioFileSourceSingleShard(RocalConte
  * \param [in] last_batch_info Determines the handling of the last batch when the shard size is not divisible by the batch size. Check RocalLastBatchPolicy() enum for possible values & If set to True, pads the shards last batch by repeating the last sample's data (dummy data).
  * \return Reference to the output tensor
  */
-extern "C" RocalTensor ROCAL_API_CALL rocALWebDatasetSourceSingleShard(RocalContext p_context,
+extern "C" RocalTensor ROCAL_API_CALL rocALWebDatasetDecoderSingleShard(RocalContext p_context,
                                                                         const char* source_path,
                                                                         const char* index_path,
                                                                         RocalImageColor rocal_color_format,
@@ -978,6 +978,6 @@ extern "C" RocalTensor ROCAL_API_CALL rocALWebDatasetSource(RocalContext p_conte
                                                             unsigned max_width,
                                                             unsigned max_height,
                                                             RocalDecoderType rocal_decoder_type,
-                                                            std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, true});
+                                                                        std::pair<RocalLastBatchPolicy, bool> last_batch_info = {RocalLastBatchPolicy::ROCAL_LAST_BATCH_FILL, true});
 
 #endif  // MIVISIONX_ROCAL_API_DATA_LOADERS_H
