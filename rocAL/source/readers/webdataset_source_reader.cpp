@@ -58,32 +58,10 @@ WebDatasetSourceReader::WebDatasetSourceReader() {
 }
 
 unsigned WebDatasetSourceReader::count_items() {
-    int ret = 0; // Default initialization
-    if (_shard_size == -1) {
-        if (_loop) return largest_shard_size_without_padding();                   // When shard_size is set to -1, The shard_size variable is not used
-        int size = std::max(largest_shard_size_without_padding(), _batch_count);  // Return the size of the largest shard amongst all the shard's size
-        ret = (size - _read_counter);
-        // Formula used to calculate - [_last_batch_padded_size = _batch_count - (_shard_size % _batch_count) ]
-        // Since "size" doesnt involve padding - we add the count of padded samples to the number of remaining elements
-        // which equals to the shard size with padding
-        if (_sharding_info.last_batch_policy == RocalBatchPolicy::PARTIAL || _sharding_info.last_batch_policy == RocalBatchPolicy::FILL) {
-            ret += _last_batch_padded_size;
-        } else if (_sharding_info.last_batch_policy == RocalBatchPolicy::DROP &&
-                   _pad_last_batch_repeated == true) { // When pad_last_batch_repeated is False - Enough
-                                                      // number of samples would not be present in the last batch - hence
-                                                      // dropped by condition handled in the loader
-            ret -= _batch_count;
-        }
-    } else if (_shard_size > 0) {
-        auto shard_size_with_padding =
-            _shard_size + (_batch_count - (_shard_size % _batch_count));
-        if (_loop)
-            return shard_size_with_padding;
-        int size = std::max(shard_size_with_padding, _batch_count);
-        ret = (size - _read_counter);
-        if (_sharding_info.last_batch_policy == RocalBatchPolicy::DROP) // The shard size is padded at the beginning of the condition, hence dropping the last batch
-            ret -= _batch_count;
-    }
+    int size = get_max_size_of_shard(_batch_size, _loop);
+    int ret = (size - _read_counter);
+    if (_sharding_info.last_batch_policy == RocalBatchPolicy::DROP && _last_batch_padded_size != 0)
+        ret -= _batch_size;
     return ((ret < 0) ? 0 : ret);
 }
 
@@ -97,7 +75,7 @@ Reader::Status WebDatasetSourceReader::initialize(ReaderConfig desc) {
     _feature_key_map = desc.feature_key_map();
     _shard_id = desc.get_shard_id();
     _shard_count = desc.get_shard_count();
-    _batch_count = desc.get_batch_size();
+    _batch_size = desc.get_batch_size();
     _loop = desc.loop();
     _meta_data_reader = desc.meta_data_reader();
     _sharding_info = desc.get_sharding_info();
@@ -107,46 +85,32 @@ Reader::Status WebDatasetSourceReader::initialize(ReaderConfig desc) {
     _shuffle = desc.shuffle();
     _pad_last_batch_repeated = _sharding_info.pad_last_batch_repeated;
     ret = folder_reading();
-    _curr_file_idx = get_start_idx(); // shard's start_idx would vary for every shard in the vector
+    _curr_file_idx = _shard_start_idx_vector[_shard_id]; // shard's start_idx would vary for every shard in the vector
     // shuffle dataset if set
     if (ret == Reader::Status::OK && _shuffle)
-        std::random_shuffle(_all_shard_file_names_padded.begin() + get_start_idx(), _all_shard_file_names_padded.begin() + get_start_idx() + actual_shard_size_without_padding());
+        std::random_shuffle(_file_names.begin() + _shard_start_idx_vector[_shard_id], _file_names.begin() + _shard_end_idx_vector[_shard_id]);
 
     return ret;
 }
 
-void WebDatasetSourceReader::increment_curr_file_idx() {
-    // Should work for both pad_last_batch = True (or) False
-    auto shard_start_idx = get_start_idx();
-    if (_stick_to_shard == false) {
-        _curr_file_idx = (_curr_file_idx + 1) % _all_shard_file_names_padded.size();
-    } else {
-        if (_curr_file_idx >= shard_start_idx &&
-            _curr_file_idx < shard_start_idx + actual_shard_size_without_padding() - 1) // checking if current-element lies within the shard size [begin_idx, last_idx -1]
-            _curr_file_idx = (_curr_file_idx + 1);
-        else
-            _curr_file_idx = shard_start_idx;
-    }
-}
-
 void WebDatasetSourceReader::incremenet_read_ptr() {
     _read_counter++;
-    increment_curr_file_idx();
+    increment_curr_file_idx(_file_names.size());
 }
 
 size_t WebDatasetSourceReader::open() {
-    auto file_path = _all_shard_file_names_padded[_curr_file_idx];  // Get next file name
+    auto file_path = _file_names[_curr_file_idx];  // Get next file name
     _last_id = file_path;
     auto last_slash_idx = _last_id.find_last_of("\\/");
     if (std::string::npos != last_slash_idx) {
         _last_id.erase(0, last_slash_idx + 1);
     }
-    _current_file_size = _all_shard_file_sizes_padded[_all_shard_file_names_padded[_curr_file_idx]];
+    _current_file_size = _file_size[_file_names[_curr_file_idx]];
     return _current_file_size;
 }
 
 size_t WebDatasetSourceReader::read_data(unsigned char *buf, size_t read_size) {
-    auto ret = read_web_dataset_at_offset(buf, _all_shard_file_names_padded[_curr_file_idx], _all_shard_file_sizes_padded[_all_shard_file_names_padded[_curr_file_idx]], _all_shard_file_offset_padded[_all_shard_file_names_padded[_curr_file_idx]], _all_shard_wds_shard_idx_mapping_padded[_all_shard_file_names_padded[_curr_file_idx]]);
+    auto ret = read_web_dataset_at_offset(buf, _file_names[_curr_file_idx], _file_size[_file_names[_curr_file_idx]], _file_offset[_file_names[_curr_file_idx]], _file_wds_shard_idx_mapping[_file_names[_curr_file_idx]]);
     if (ret != Reader::Status::OK)
         THROW("WebDatasetSourceReader: Error in reading tar records of the web  dataset reader");
     incremenet_read_ptr();
@@ -167,8 +131,7 @@ int WebDatasetSourceReader::release() {
 
 void WebDatasetSourceReader::reset() {
     if (_shuffle)
-        std::random_shuffle(_all_shard_file_names_padded.begin() + get_start_idx(),
-                            _all_shard_file_names_padded.begin() + get_start_idx() + actual_shard_size_without_padding());
+        std::random_shuffle(_file_names.begin() + _shard_start_idx_vector[_shard_id], _file_names.begin() + _shard_end_idx_vector[_shard_id]);
     _read_counter = 0;
     _curr_file_idx = 0;
 }
@@ -396,74 +359,16 @@ Reader::Status WebDatasetSourceReader::folder_reading() {
             }
    
     }
-    auto dataset_size = _file_count_all_shards;
+    size_t padded_samples = ((_shard_size > 0) ? _shard_size : largest_shard_size_without_padding()) % _batch_size;
+    _last_batch_padded_size = ((_batch_size > 1) && (padded_samples > 0)) ? (_batch_size - padded_samples) : 0;
+
     // Pad the _file_names with last element of the shard in the vector when _pad_last_batch_repeated is True
-    if (_shard_size > 0)
-        _padded_samples = _shard_size % _batch_count;
-    else
-        _padded_samples = largest_shard_size_without_padding() % _batch_count;
-    if (_padded_samples != 0)
-        _last_batch_padded_size = _batch_count - _padded_samples;
-
-    if (_pad_last_batch_repeated == true) { 
-        // pad the last sample when the dataset_size is not divisible by
-        // the number of shard's (or) when the shard's size is not
-        // divisible by the batch size making each shard having equal
-        // number of samples
-        for (uint shard_id = 0; shard_id < _shard_count; shard_id++) {
-            uint start_idx = (dataset_size * shard_id) / _shard_count;
-            uint shard_size_without_padding = std::floor((shard_id + 1) * dataset_size / _shard_count) - floor(shard_id * dataset_size / _shard_count);
-            uint shard_size_with_padding = std::ceil(dataset_size * 1.0 / _shard_count);
-
-            auto start = _file_names.begin() + start_idx;
-            auto end = _file_names.begin() + start_idx + shard_size_without_padding;
-
-            auto start_file_size = std::next(_file_size.begin(), start_idx);
-            auto end_file_size = std::next(_file_size.begin(), start_idx + shard_size_without_padding);
-
-            auto start_file_offset = std::next(_file_offset.begin(), start_idx);
-            auto end_file_offset = std::next(_file_offset.begin(), start_idx + shard_size_without_padding);
-
-            auto start_all_shard_wds_shard_idx_mapping= std::next(_file_wds_shard_idx_mapping.begin(), start_idx);
-            auto end_all_shard_wds_shard_idx_mapping = std::next(_file_wds_shard_idx_mapping.begin(), start_idx + shard_size_without_padding);
-            if (start != end && start <= _file_names.end() &&
-                end <= _file_names.end()) {
-                _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), start, end);
-
-                for (auto it = start_file_size; it != end_file_size; ++it)
-                    _all_shard_file_sizes_padded.insert(*it);
-                
-                for (auto it = start_file_offset; it != end_file_offset; ++it)
-                    _all_shard_file_offset_padded.insert(*it);
-                
-                for (auto it = start_all_shard_wds_shard_idx_mapping; it != end_all_shard_wds_shard_idx_mapping; ++it)
-                    _all_shard_wds_shard_idx_mapping_padded.insert(*it);
-                
-            }
-            if (shard_size_with_padding % _batch_count) {
-                _num_padded_samples = (shard_size_with_padding - shard_size_without_padding) + _batch_count - (shard_size_with_padding % _batch_count);
-                _file_count_all_shards += _num_padded_samples;
-                _all_shard_file_names_padded.insert(_all_shard_file_names_padded.end(), _num_padded_samples, _all_shard_file_names_padded.back());
-                for (uint i = 0; i < _num_padded_samples; ++i) {
-                    _all_shard_file_sizes_padded.insert({_all_shard_file_names_padded.back(), _file_size[_all_shard_file_names_padded.back()]});
-                    _all_shard_file_offset_padded.insert({_all_shard_file_names_padded.back(), _all_shard_file_offset_padded[_all_shard_file_names_padded.back()]});
-                    _all_shard_wds_shard_idx_mapping_padded.insert({_all_shard_file_names_padded.back(), _all_shard_wds_shard_idx_mapping_padded[_all_shard_file_names_padded.back()]});
-
-                }
-            }
-        }
-    } else {
-        _all_shard_file_names_padded = _file_names;
-        _all_shard_file_sizes_padded = _file_size;
-        _all_shard_file_offset_padded = _file_offset;
-        _all_shard_wds_shard_idx_mapping_padded = _file_wds_shard_idx_mapping;
-    }
-        // _last_file_name = _all_shard_file_names_padded[_all_shard_file_names_padded.size() - 1];
-        // _last_file_size = _all_shard_file_sizes_padded[_last_file_name];
-
-
-    if (!_all_shard_file_names_padded.empty())
+    if (_pad_last_batch_repeated == true)
+        update_filenames_with_padding(_file_names, _batch_size);
+    if (!_file_names.empty())
         LOG("WebDatasetSourceReader ShardID [" + TOSTR(_shard_id) + "] Total of " + TOSTR(_file_names.size()) + " images loaded from " + _full_path)
+    _last_file_name = _file_names[_file_names.size() - 1];
+    compute_start_and_end_idx_of_all_shards();
     closedir(_sub_dir);
     return ret;
 }
@@ -491,25 +396,3 @@ Reader::Status WebDatasetSourceReader::read_web_dataset_at_offset(unsigned char 
     current_tar_file_stream->read_into_buffer(buff, file_size);
     return ret;
 }
-
-size_t WebDatasetSourceReader::get_start_idx() {
-    _shard_start_idx = (get_dataset_size() * _shard_id) / _shard_count;
-    return _shard_start_idx;
-}
-
-size_t WebDatasetSourceReader::get_dataset_size() {
-    return _file_count_all_shards;
-}
-
-size_t WebDatasetSourceReader::actual_shard_size_without_padding() {
-    return std::floor((_shard_id + 1) * get_dataset_size() / _shard_count) - floor(_shard_id * get_dataset_size() / _shard_count);
-}
-
-size_t WebDatasetSourceReader::largest_shard_size_without_padding() {
-  return std::ceil(get_dataset_size() * 1.0 / _shard_count);
-}
-
-void WebDatasetSourceReader::increment_shard_id() {
-    _shard_id = (_shard_id + 1) % _shard_count;
-}
-
