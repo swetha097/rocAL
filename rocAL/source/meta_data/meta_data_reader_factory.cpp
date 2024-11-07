@@ -38,9 +38,18 @@ THE SOFTWARE.
 #include "meta_data/tf_meta_data_reader.h"
 #include "meta_data/tf_meta_data_reader_detection.h"
 #include "meta_data/video_label_reader.h"
+#include "meta_data/webdataset_meta_data_reader.h"
 
 std::shared_ptr<MetaDataReader> create_meta_data_reader(const MetaDataConfig& config, pMetaDataBatch& meta_data_batch) {
     switch (config.reader_type()) {
+        case MetaDataReaderType::WEBDATASET_META_DATA_READER: {
+            if (config.type() != MetaDataType::AsciiValue)
+                THROW("WEBDATASET_META_DATA_READER can only be used to load ascii values")
+            auto meta_data_reader = std::make_shared<WebDataSetMetaDataReader>();
+            meta_data_batch = std::make_shared<AsciiValueBatch>();
+            meta_data_reader->init(config, meta_data_batch);
+            return meta_data_reader;
+        } break;
         case MetaDataReaderType::FOLDER_BASED_LABEL_READER: {
             if (config.type() != MetaDataType::Label)
                 THROW("FOLDER_BASED_LABEL_READER can only be used to load labels")
