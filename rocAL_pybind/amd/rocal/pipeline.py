@@ -255,6 +255,9 @@ class Pipeline(object):
     
     def get_last_batch_padded_size(self):
         return b.getLastBatchPaddedSize(self._handle)
+    
+    def get_ascii_datas(self):
+        return b.getAsciiDatas(self._handle)
 
     def run(self):
         """
