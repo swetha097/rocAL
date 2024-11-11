@@ -204,3 +204,11 @@ class BatchRNG {
     int64_t _seed;
     std::vector<RNG> _rngs;
 };
+/*! \brief MissingComponentsBehaviour for Webdataset
+ *
+ */
+enum MissingComponentsBehaviour {
+    ERROR = 0,
+    SKIP,
+    EMPTY
+};

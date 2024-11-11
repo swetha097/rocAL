@@ -353,3 +353,20 @@ def mxnet(path, stick_to_shard=False, pad_last_batch=False):
     mxnet_metadata = b.mxnetReader(
         Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
     return mxnet_metadata
+
+def webdataset(path, index_paths="", ext = None, missing_components_behavior = types.ERROR):
+    """
+    TODO: to be added later
+    """
+    Pipeline._current_pipeline._reader = "WebDataset"
+     # Output
+    kwargs_pybind = {
+        "source_path": path,
+        "index_path": index_paths,
+        "ext": ext,
+        "missing_components_behavior": missing_components_behavior,
+        "is_output": True
+    }
+    webdata_metadata = b.webDatasetReader(
+        Pipeline._current_pipeline._handle, *(kwargs_pybind.values()))
+    return webdata_metadata
