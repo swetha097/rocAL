@@ -101,6 +101,10 @@ Reader::Status WebDatasetSourceReader::initialize(ReaderConfig desc) {
     _loop = desc.loop();
     _meta_data_reader = desc.meta_data_reader();
     _last_batch_info = desc.get_last_batch_policy();
+    std::cerr << "\n _sharding_info.last_batch_policy" << _last_batch_info.first; 
+    std::cerr << "\n _sharding_info.pad_last_batch_repeated" << _last_batch_info.second; 
+    // std::cerr << "\n _sharding_info.stick_to_shard" << _sharding_info.stick_to_shard;
+    // std::cerr << "\n _sharding_info.shard_size" << _sharding_info.shard_size;
     _shuffle = desc.shuffle();
     _pad_last_batch_repeated = _last_batch_info.second;
     _stick_to_shard = true;

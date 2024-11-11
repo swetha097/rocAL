@@ -155,7 +155,7 @@ void WebDataSetMetaDataReader::parse_sample_description(
     // Reading consecutive components
     ComponentDescription component;
     while (components_stream >> component.ext) {
-        std::cerr << "\n index_version" << index_version;
+        // std::cerr << "\n index_version" << index_version;
 
         if (index_version == create_version_number(1, 2)) {
             if (!(components_stream >> component.offset >> component.size >>
