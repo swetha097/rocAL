@@ -118,7 +118,7 @@ from rocal_pybind.types import LAST_BATCH_DROP
 from rocal_pybind.types import LAST_BATCH_PARTIAL
 
 #     RocalMissingComponentsBehaviour
-from rocal_pybind.types import ERROR
+from rocal_pybind.types import THROW_ERROR
 from rocal_pybind.types import SKIP
 from rocal_pybind.types import EMPTY
 
@@ -200,7 +200,7 @@ _known_types = {
     LAST_BATCH_DROP : ("LAST_BATCH_DROP", LAST_BATCH_DROP),
     LAST_BATCH_PARTIAL : ("LAST_BATCH_PARTIAL", LAST_BATCH_PARTIAL),
 
-    ERROR : ("ERROR", ERROR),
+    THROW_ERROR : ("THROW_ERROR", THROW_ERROR),
     SKIP : ("SKIP", SKIP),
     EMPTY : ("EMPTY", EMPTY),
 }

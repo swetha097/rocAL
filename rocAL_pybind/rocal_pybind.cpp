@@ -447,7 +447,7 @@ PYBIND11_MODULE(rocal_pybind, m) {
         .value("LAST_BATCH_PARTIAL", ROCAL_LAST_BATCH_PARTIAL)
         .export_values();
     py::enum_<RocalMissingComponentsBehaviour>(types_m, "RocalMissingComponentsBehaviour", "Rocal Missing components behavior")
-        .value("ERROR", ROCAL_ERROR)
+        .value("THROW_ERROR", ROCAL_THROW_ERROR)
         .value("SKIP", ROCAL_SKIP)
         .value("EMPTY", ROCAL_EMPTY)
         .export_values();

@@ -459,7 +459,7 @@ enum RocalLastBatchPolicy {
 enum RocalMissingComponentsBehaviour {
     /*! \brief ROCAL_ERROR
      */
-    ROCAL_ERROR = 0,
+    ROCAL_THROW_ERROR = 0,
     /*! \brief ROCAL_SKIP
      */
     ROCAL_SKIP = 1,
