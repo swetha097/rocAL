@@ -36,7 +36,6 @@ class TextFileMetaDataReader : public MetaDataReader {
     bool set_timestamp_mode() override { return false; }
 
     const std::map<std::string, std::shared_ptr<MetaData>>& get_map_content() override { return _map_content; }
-    std::vector<std::string> get_relative_file_path() override { return _relative_file_path; }
     TextFileMetaDataReader();
 
    private:
@@ -46,5 +45,4 @@ class TextFileMetaDataReader : public MetaDataReader {
     void add(std::string image_name, int label);
     std::map<std::string, std::shared_ptr<MetaData>> _map_content;
     std::string _path;
-    std::vector<std::string> _relative_file_path {};
 };
