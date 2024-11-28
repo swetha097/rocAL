@@ -2174,8 +2174,7 @@ rocalPreEmphasisFilter(RocalContext p_context,
     try {
         RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(output_datatype);
         if (op_tensor_datatype != RocalTensorDataType::FP32) {
-            WRN("Only FP32 dtype is supported for PreEmphasis filter augmentation.")
-            op_tensor_datatype = RocalTensorDataType::FP32;
+            THROW("Only FP32 dtype is supported for PreEmphasis filter augmentation.")
         }
         TensorInfo output_info = input->info();
         output_info.set_data_type(op_tensor_datatype);
@@ -2245,6 +2244,329 @@ rocalSpectrogram(
                                                                                   power, nfft, window_length,
                                                                                   window_step, window_fn);
     } catch(const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalToDecibels(
+    RocalContext p_context,
+    RocalTensor p_input,
+    bool is_output,
+    float cutoff_db,
+    float multiplier,
+    float reference_magnitude,
+    RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorDataType op_tensor_data_type = static_cast<RocalTensorDataType>(output_datatype);
+        TensorInfo output_info = input->info();
+        if (op_tensor_data_type != RocalTensorDataType::FP32) {
+            THROW("Only FP32 dtype is supported for To decibels augmentation.")
+        }
+        output_info.set_data_type(op_tensor_data_type);
+        if (input->info().layout() == RocalTensorlayout::NFT || input->info().layout() == RocalTensorlayout::NTF) // Layout is changed when input is from spectrogram/mel filter bank
+            output_info.set_tensor_layout(RocalTensorlayout::NHW);
+        output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<ToDecibelsNode>({input}, {output})->init(cutoff_db, multiplier, reference_magnitude);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalResample(RocalContext p_context,
+              RocalTensor p_input,
+              RocalTensor p_output_resample_rate,
+              bool is_output,
+              float sample_hint,
+              float quality,
+              RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr) || (p_output_resample_rate == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    Tensor* resampled_output = nullptr;
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    auto output_resample_rate = static_cast<Tensor*>(p_output_resample_rate);
+    try {
+        TensorInfo output_info = input->info();
+        RocalTensorDataType op_tensor_data_type = static_cast<RocalTensorDataType>(output_datatype);
+        if (op_tensor_data_type != RocalTensorDataType::FP32) {
+            THROW("Only FP32 dtype is supported for resample augmentation.")
+        }
+        output_info.set_data_type(op_tensor_data_type);
+        if (sample_hint > 0) {
+            std::vector<size_t> max_dims = output_info.max_shape();
+            std::vector<size_t> dims = output_info.dims();
+            dims[1] = std::ceil(sample_hint);
+            dims[2] = max_dims[1];
+            output_info.set_dims(dims);
+        } else {
+            THROW("Please pass a valid resample hint")
+        }
+        resampled_output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<ResampleNode>({input}, {resampled_output})->init(output_resample_rate, quality);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return resampled_output;
+}
+
+RocalTensor rocalTensorMulScalar(RocalContext p_context,
+                                 RocalTensor p_input,
+                                 bool is_output,
+                                 float scalar,
+                                 RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorDataType op_tensor_data_type = static_cast<RocalTensorDataType>(output_datatype);
+        if (op_tensor_data_type != RocalTensorDataType::FP32) {
+            THROW("Only FP32 dtype is supported for TensorMulScalar augmentation.")
+        }
+        TensorInfo output_info = input->info();
+        output_info.set_data_type(op_tensor_data_type);
+        output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<TensorMulScalarNode>({input}, {output})->init(scalar);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor rocalTensorAddTensor(RocalContext p_context,
+                                 RocalTensor p_input1,
+                                 RocalTensor p_input2,
+                                 bool is_output,
+                                 RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input1 == nullptr) || (p_input2 == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input1 = static_cast<Tensor*>(p_input1);
+    auto input2 = static_cast<Tensor*>(p_input2);
+    try {
+        RocalTensorDataType op_tensor_data_type = static_cast<RocalTensorDataType>(output_datatype);
+        if (op_tensor_data_type != RocalTensorDataType::FP32) {
+            THROW("Only FP32 dtype is supported for TensorAddTensor augmentation.")
+        }
+        TensorInfo output_info = input1->info();
+        output_info.set_data_type(op_tensor_data_type);
+        output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<TensorAddTensorNode>({input1, input2}, {output});
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor rocalUniformDistribution(RocalContext p_context,
+                                     RocalTensor p_input,
+                                     bool is_output,
+                                     std::vector<float>& range) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        std::vector<size_t> dims = {context->user_batch_size(), 1};
+        auto info = TensorInfo(dims,
+                               context->master_graph->mem_type(),
+                               RocalTensorDataType::FP32);
+        info.set_dims(dims);
+        output = context->master_graph->create_tensor(info, is_output);
+        output->create_from_handle(context->master_graph->get_vx_context());
+        context->master_graph->add_node<UniformDistributionNode>({input}, {output})->init(range);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor rocalNormalDistribution(RocalContext p_context,
+                                    RocalTensor p_input,
+                                    bool is_output,
+                                    float mean,
+                                    float stddev) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        std::vector<size_t> dims = {context->user_batch_size(), 1};
+        auto info = TensorInfo(dims,
+                               context->master_graph->mem_type(),
+                               RocalTensorDataType::FP32);
+        info.set_dims(dims);
+        output = context->master_graph->create_tensor(info, is_output);
+        output->create_from_handle(context->master_graph->get_vx_context());
+        context->master_graph->add_node<NormalDistributionNode>({input}, {output})->init(mean, stddev);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+std::pair<RocalTensor, RocalTensor> ROCAL_API_CALL
+rocalNonSilentRegionDetection(
+    RocalContext p_context,
+    RocalTensor p_input,
+    bool is_output,
+    float cutoff_db,
+    float reference_power,
+    int reset_interval,
+    int window_length) {
+    Tensor* anchor_output = nullptr;
+    Tensor* shape_output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr))
+        ERR("Invalid ROCAL context or invalid input tensor")
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        std::vector<size_t> dims1 = {context->user_batch_size(), 1};
+        auto info1 = TensorInfo(std::vector<size_t>(std::move(dims1)),
+                                context->master_graph->mem_type(),
+                                RocalTensorDataType::INT32);
+        info1.set_max_shape();
+        std::vector<size_t> dims2 = {context->user_batch_size(), 1};
+        auto info2 = TensorInfo(std::vector<size_t>(std::move(dims2)),
+                                context->master_graph->mem_type(),
+                                RocalTensorDataType::INT32);
+        info2.set_max_shape();
+        anchor_output = context->master_graph->create_tensor(info1, is_output);
+        shape_output = context->master_graph->create_tensor(info2, is_output);
+        context->master_graph->add_node<NonSilentRegionDetectionNode>({input}, {anchor_output, shape_output})->init(cutoff_db, reference_power, window_length, reset_interval);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+
+    return std::make_pair(anchor_output, shape_output);
+}
+
+RocalTensor ROCAL_API_CALL
+rocalSlice(
+    RocalContext p_context,
+    RocalTensor p_input,
+    bool is_output,
+    RocalTensor p_anchor,
+    RocalTensor p_shape,
+    std::vector<float> fill_values,
+    RocalOutOfBoundsPolicy policy,
+    RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr))
+        ERR("Invalid ROCAL context or invalid input tensor")
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    auto anchor = static_cast<Tensor*>(p_anchor);
+    auto shape = static_cast<Tensor*>(p_shape);
+    try {
+        RocalTensorDataType op_tensor_data_type = static_cast<RocalTensorDataType>(output_datatype);
+        TensorInfo output_info = input->info();
+        output_info.set_data_type(op_tensor_data_type);
+        output_info.set_max_shape();
+        output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<SliceNode>({input}, {output})->init(anchor, shape, fill_values, policy);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalNormalize(RocalContext p_context, RocalTensor p_input, std::vector<unsigned>& axes,
+               std::vector<float>& mean, std::vector<float>& std_dev, bool is_output,
+               float scale, float shift,
+               RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorDataType op_tensor_datatype = static_cast<RocalTensorDataType>(output_datatype);
+        TensorInfo output_info = input->info();
+        output_info.set_data_type(op_tensor_datatype);
+        output = context->master_graph->create_tensor(output_info, is_output);
+        std::shared_ptr<NormalizeNode> normalize_node = context->master_graph->add_node<NormalizeNode>({input}, {output});
+        normalize_node->init(axes, mean, std_dev, scale, shift);
+    } catch (const std::exception& e) {
+        context->capture_error(e.what());
+        ERR(e.what())
+    }
+    return output;
+}
+
+RocalTensor ROCAL_API_CALL
+rocalMelFilterBank(
+    RocalContext p_context,
+    RocalTensor p_input,
+    bool is_output,
+    float freq_high,
+    float freq_low,
+    RocalMelScaleFormula mel_formula,
+    int nfilter,
+    bool normalize,
+    float sample_rate,
+    RocalTensorOutputType output_datatype) {
+    Tensor* output = nullptr;
+    if ((p_context == nullptr) || (p_input == nullptr)) {
+        ERR("Invalid ROCAL context or invalid input tensor")
+        return output;
+    }
+    auto context = static_cast<Context*>(p_context);
+    auto input = static_cast<Tensor*>(p_input);
+    try {
+        RocalTensorDataType op_tensor_data_type = (RocalTensorDataType)output_datatype;
+        if (op_tensor_data_type != RocalTensorDataType::FP32) {
+            THROW("Only FP32 dtype is supported for MelFilterBank augmentation.")
+        }
+        TensorInfo output_info = input->info();
+        std::vector<size_t> max_dims = output_info.max_shape();
+        int max_frame = std::max(0ul, max_dims[1]);
+        std::vector<size_t> dims = output_info.dims();
+        dims[1] = nfilter;
+        dims[2] = max_frame;
+        output_info.set_dims(dims);
+        output_info.set_data_type(op_tensor_data_type);
+        output = context->master_graph->create_tensor(output_info, is_output);
+        context->master_graph->add_node<MelFilterBankNode>({input}, {output})->init(freq_high, freq_low, mel_formula, nfilter, normalize, sample_rate);
+    } catch (const std::exception& e) {
         context->capture_error(e.what());
         ERR(e.what())
     }

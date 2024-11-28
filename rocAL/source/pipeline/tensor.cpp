@@ -29,7 +29,6 @@ THE SOFTWARE.
 
 #include <cstring>
 #include <stdexcept>
-
 #include "pipeline/commons.h"
 #include "pipeline/tensor.h"
 
@@ -77,6 +76,8 @@ vx_enum interpret_tensor_data_type(RocalTensorDataType data_type) {
             return VX_TYPE_FLOAT16;
         case RocalTensorDataType::UINT8:
             return VX_TYPE_UINT8;
+        case RocalTensorDataType::INT32:
+            return VX_TYPE_INT32;
         default:
             THROW("Unsupported Tensor type " + TOSTR(data_type))
     }
@@ -411,14 +412,13 @@ unsigned Tensor::copy_data(hipStream_t stream, void *host_memory, bool sync) {
 
 unsigned Tensor::copy_data(void *user_buffer, RocalOutputMemType external_mem_type) {
     if (_mem_handle == nullptr) return 0;
-
     if (external_mem_type == RocalOutputMemType::ROCAL_MEMCPY_GPU) {
 #if ENABLE_HIP
         if (_info._mem_type == RocalMemType::HIP) {
             // copy from device to device
             hipError_t status;
             if ((status = hipMemcpyDtoD((void *)user_buffer, _mem_handle, _info.data_size())))
-                THROW("copy_data::hipMemcpyDtoD failed: " + TOSTR(status))
+                THROW("copy_data::hipMemcpyDtoD failed: " + hipGetErrorName(status))
         } else if (_info._mem_type == RocalMemType::HOST) {
             // copy from host to device
             hipError_t status;
@@ -447,20 +447,20 @@ unsigned Tensor::copy_data(void *user_buffer, RocalOutputMemType external_mem_ty
     return 0;
 }
 
-unsigned Tensor::copy_data(void *user_buffer, uint max_rows, uint max_cols) {
+unsigned Tensor::copy_data(void *user_buffer, uint x_offset, uint y_offset, uint roi_width, uint roi_height) {
     if (_mem_handle == nullptr) return 0;
     // TODO : Handle this case for HIP buffer
     auto max_shape_rows = _info.max_shape().at(1);
     auto dtype_size = _info.data_type_size();
     auto num_of_bytes_max_rows = max_shape_rows * dtype_size;
     auto src_stride = (_info.max_shape().at(0) * num_of_bytes_max_rows);
-    auto num_of_bytes_rows = max_cols * dtype_size;
-    auto dst_stride = (max_rows * num_of_bytes_rows);
+    auto num_of_bytes_rows = roi_width * dtype_size;
+    auto dst_stride = (roi_height * num_of_bytes_rows);
 
     for (uint i = 0; i < _info._batch_size; i++) {
-        auto temp_src_ptr = static_cast<unsigned char *>(_mem_handle) + i * src_stride;
+        auto temp_src_ptr = static_cast<unsigned char *>(_mem_handle) + i * src_stride + _info.max_shape().at(0) * y_offset + x_offset;
         auto temp_dst_ptr = static_cast<unsigned char *>(user_buffer) + i * dst_stride;
-        for (uint height = 0; height < max_rows; height++) {
+        for (uint height = 0; height < roi_height; height++) {
             memcpy(temp_dst_ptr, temp_src_ptr, num_of_bytes_rows);
             temp_src_ptr += num_of_bytes_max_rows;
             temp_dst_ptr += num_of_bytes_rows;
