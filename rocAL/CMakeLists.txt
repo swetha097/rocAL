@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 
 # Set Project Version and Language
 project(rocal VERSION ${VERSION} LANGUAGES CXX)
@@ -303,6 +303,11 @@ if(${BUILD_ROCAL})
     if(NOT FFMPEG_FOUND)
         message("-- ${Yellow}NOTE: rocAL built without FFmpeg Video Decode Functionality${ColourReset}")
     else()
+        if (FFMPEG_VERSION_4)
+            target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FFMPEG_VERSION_4=1)
+        else()
+            target_compile_definitions(${PROJECT_NAME} PUBLIC USE_FFMPEG_VERSION_4=0)
+        endif()
         include_directories(${AVUTIL_INCLUDE_DIR} ${AVCODEC_INCLUDE_DIR} ${SWSCALE_INCLUDE_DIR} ${AVFORMAT_INCLUDE_DIR})
         set(LINK_LIBRARY_LIST ${LINK_LIBRARY_LIST} ${FFMPEG_LIBRARIES})
         message("-- ${White}rocAL built with FFmpeg Video Decode Functionality${ColourReset}")
@@ -341,11 +346,11 @@ if(${BUILD_ROCAL})
     endif()
     # LibTar
     if(NOT LIBTAR_FOUND)
-        message("-- ${White}NOTE: rocAL built without LibTar - WebDataset Functionalities will not be supported${ColourReset}")
+        message("-- ${Yellow}NOTE: rocAL built without LibTar - WebDataset Functionalities will not be supported${ColourReset}")
     else()
         include_directories(${LIBTAR_INCLUDE_DIRS})
         set(LINK_LIBRARY_LIST ${LINK_LIBRARY_LIST} ${LIBTAR_LIBRARIES})
-        message("-- ${Yellow}NOTE: rocAL built with LibTar support - WebDataset Functionalities enabled${ColourReset}")
+        message("-- ${White}NOTE: rocAL built with LibTar support - WebDataset Functionalities enabled${ColourReset}")
     endif()
     # -Wall -- Enable most warning messages
     # -mavx2 -- Support MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX and AVX2 built-in functions and code generation

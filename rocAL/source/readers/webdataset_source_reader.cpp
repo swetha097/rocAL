@@ -240,8 +240,7 @@ void WebDatasetSourceReader::parse_index_files(
 void WebDatasetSourceReader::parse_tar_files(std::vector<SampleDescription>& samples_vector,
                                               std::vector<ComponentDescription>& components_vector,
                                               std::unique_ptr<std::ifstream>& tar_file) {
-    // TarArchive tar_archive(std::move(tar_file));
-    TarArchive tar_archive(std::move(tar_file)); // Dereferencing the unique_ptr
+    TarArchive tar_archive(std::move(tar_file));
 
     std::string last_filename;
     for (; !tar_archive.at_end_of_archive(); tar_archive.advance_to_next_file_in_tar()) {
@@ -407,6 +406,6 @@ Reader::Status WebDatasetSourceReader::read_web_dataset_at_offset(unsigned char*
     auto ret = Reader::Status::OK;
     auto& current_tar_file_stream = _wds_shards[wds_shard_index];
     current_tar_file_stream->seekg(offset, std::ios::beg);
-    current_tar_file_stream->read(reinterpret_cast<char*>(buff), file_size); // Check if needed
+    current_tar_file_stream->read(reinterpret_cast<char*>(buff), file_size);
     return ret;
 }
