@@ -63,6 +63,7 @@ Reader::Status FileSourceReader::initialize(ReaderConfig desc) {
     _stick_to_shard = _sharding_info.stick_to_shard;
     _shard_size = _sharding_info.shard_size;
     ret = subfolder_reading();
+    _curr_file_idx = _shard_start_idx_vector[_shard_id]; // shard's start_idx would vary for every shard in the vector
     // shuffle dataset if set
     if (ret == Reader::Status::OK && _shuffle)
         std::random_shuffle(_file_names.begin() + _shard_start_idx_vector[_shard_id],
@@ -232,6 +233,35 @@ Reader::Status FileSourceReader::generate_file_names() {
 
     size_t padded_samples = ((_shard_size > 0) ? _shard_size : largest_shard_size_without_padding()) % _batch_size;
     _last_batch_padded_size = ((_batch_size > 1) && (padded_samples > 0)) ? (_batch_size - padded_samples) : 0;
+
+    // std::cerr << "Filena,es size : " << _file_names.size() << "\n";
+    // std::vector<std::string> sharded_fnames(_file_names.size());
+    // auto size_per_shard = _file_names.size() / _shard_count;
+    // int idx = 0;
+    // for (unsigned f = 0; f < size_per_shard; f++) {
+    //     for (unsigned sid = 0; sid < _shard_count; sid++) {
+    //         sharded_fnames[_shard_start_idx_vector[sid] + f] = _file_names[idx++];
+    //     }
+    // }
+    // _file_names = sharded_fnames;
+    /* Working setup
+    std::vector<std::string> sharded_fnames(_file_names.size());
+    std::cerr << "File names size : " << _file_names.size() << "\n";
+    // auto size_per_shard = _file_names.size() / _shard_count;
+    int idx = 0;
+    for (unsigned sid = 0; sid < _shard_count; sid++) {
+        for (unsigned f = 0; f < _file_names.size(); f++) {
+            if (f % _shard_count == sid) {
+                sharded_fnames[idx++] = _file_names[f];
+                std::cerr << "idx : " << f << " ";
+            }
+        }
+    }
+    _file_names = sharded_fnames;
+    std::cerr << "File names size : " << _file_names.size() << "\n";
+    */
+    // for (int f = 0; f < _file_names.size(); f++)
+    //     std::cerr << _file_names[f];
 
     // Pad the _file_names with last element of the shard in the vector when _pad_last_batch_repeated is True
     if (_pad_last_batch_repeated == true) {
