@@ -28,19 +28,17 @@ from shutil import which
 
 class CreateIndexFiles:
 
-    tar_block_size = 512
     index_file_version = "v1.2"
 
-    def __init__(self, path_to_tar_archive, index_path, verbosity=True):
+    def __init__(self, path_to_tar_archive, index_path):
         self.path_to_tar_archive = path_to_tar_archive
         self.index_path = index_path
         self.file_index = open(self.index_path, "w")
-        self.verbosity = verbosity
 
     def __enter__(self):
         return self
 
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     def open(self):
@@ -56,8 +54,6 @@ class CreateIndexFiles:
     def reset(self):
         self.close()
         self.open()
-
-    @staticmethod
     def split_filepath_name(path):
         dot_pos = path.find(".", path.rfind("/") + 1)
         return path[:dot_pos], path[dot_pos + 1 :]
@@ -69,7 +65,7 @@ class CreateIndexFiles:
             stderr=subprocess.PIPE,
         )
         tar_types_sizes_proc = subprocess.Popen(
-            ["tar", "--verbosity", "--list", "--file", self.path_to_tar_archive],
+            ["tar", "--verbose", "--list", "--file", self.path_to_tar_archive],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
@@ -99,22 +95,17 @@ class CreateIndexFiles:
             yield offset, name, size
 
     def get_data_from_tar_files(self):
-        archive_file = tarfile.open(self.path_to_tar_archive)
-        for member in iter(archive_file):
-            if member.type != tarfile.REGTYPE:
+
+        file_arch = tarfile.open(self.path_to_tar_archive)
+        for member_file_arch in iter(file_arch):
+            if member_file_arch.type != tarfile.REGTYPE:
                 continue
-            file_offset = archive_file.fileobj.tell()
-            yield file_offset, member.name, member.size
+            offset = file_arch.fileobj.tell()
+            yield offset, member_file_arch.name, member_file_arch.size
 
     def create_index_from_tar(self):
         self.reset()
 
-        start_time = time.time()
-        counter = 0
-        report_step = 100000
-
-        if self.verbosity:
-            print(f"time: {time.time() - start_time:.2f} count: {counter} stage: collect")
 
         # Aggregates extensions in samples
         aggregated_data = []
@@ -123,11 +114,6 @@ class CreateIndexFiles:
         for offset, name, size in (
             self.get_tar_files_data() if which("tar") is not None else self.get_data_from_tar_files()
         ):
-            if counter % report_step == 0 and counter > 0:
-                current_time = time.time()
-                if self.verbosity:
-                    print(f"time: {current_time - start_time:.2f} count: {counter} stage: collect")
-            counter += 1
 
             basename, extension = CreateIndexFiles.split_filepath_name(name)
 
@@ -145,22 +131,13 @@ class CreateIndexFiles:
 
         self.file_index.write(f"{CreateIndexFiles.index_file_version} {len(aggregated_data)}\n")
         for data_item in aggregated_data:
-            if counter % report_step == 0:
-                current_time = time.time()
-                if self.verbosity:
-                    print(f"time: {current_time - start_time:.2f} count: {counter} at stage: index")
             self.file_index.write(" ".join(map(lambda component: " ".join(map(str, component)), data_item)))
             self.file_index.write("\n")
-            counter += 1
 
-        current_time = time.time()
-        if self.verbosity:
-            print(f"time: {current_time - start_time:.2f} count: {counter} at stage: done")
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description="Creates webdataset index files for all tar files in the given directory.",
+        description="Creates index files for all the tar files in the specified directory.",
     )
     parser.add_argument(
         "directory",
@@ -180,12 +157,9 @@ def main():
     for tar_file in tar_files:
         tar_path = os.path.join(args.directory, tar_file)
         index_path = os.path.join(args.directory, os.path.splitext(tar_file)[0] + ".idx")
-        print(f"Processing {tar_path} -> {index_path}")
+        print(f"Processing tar files {tar_path} to index files {index_path}")
         with CreateIndexFiles(tar_path, index_path) as creator:
             creator.create_index_from_tar()
 
 if __name__ == "__main__":
     main()
-
-
-
